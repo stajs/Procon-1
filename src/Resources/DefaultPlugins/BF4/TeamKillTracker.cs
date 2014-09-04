@@ -27,9 +27,12 @@ namespace PRoConEvents
 			ExecuteCommand("procon.protected.send", "admin.say", message, "all");
 			ExecuteCommand("procon.protected.chat.write", "(AdminSay) " + message);
 
-			ExecuteCommand("procon.protected.send", "admin.say", "Boot!", "all");
-			ExecuteCommand("procon.protected.chat.write", "(AdminSay) Boot!");
-			ExecuteCommand("procon.protected.send", "admin.kickPlayer", strSoldierName, "No more swapsies for you bro.");
+			message = "Say bye-bye to stajs. Kicked in 20 seconds.";
+
+			ExecuteCommand("procon.protected.send", "admin.say", message, "all");
+			ExecuteCommand("procon.protected.chat.write", "(AdminSay) " + message);
+			ExecuteCommand("procon.protected.tasks.add", "TeamKillTracker", "20", "1", "1", "procon.protected.send", "admin.kickPlayer", strSoldierName, "Boot!");
+			//ExecuteCommand("procon.protected.send", "admin.kickPlayer", strSoldierName, "No more swapsies for you bro.");
 		}
 
 		public void OnPluginLoaded(string strHostName, string strPort, string strPRoConVersion)
