@@ -7,33 +7,10 @@ namespace PRoConEvents
 {
 	public class TeamKillTracker : PRoConPluginAPI, IPRoConPluginInterface
 	{
-		private string ReplaceStaches(string s)
-		{
-			return s.Replace("{", "~(").Replace("}", ")~");
-		}
+		private static object _lock = new object();
+		private Dictionary<string, int> _teamSwaps = new Dictionary<string, int>();
 
-		private void WriteConsole(string message)
-		{
-			ExecuteCommand("procon.protected.pluginconsole.write", ReplaceStaches(message));
-		}
-
-		public override void OnPlayerTeamChange(string strSoldierName, int iTeamID, int iSquadID)
-		{
-			if (strSoldierName != "stajs")
-				return;
-
-			var message = string.Format("{0} joined team {1}.", strSoldierName, iTeamID);
-
-			ExecuteCommand("procon.protected.send", "admin.say", message, "all");
-			ExecuteCommand("procon.protected.chat.write", "(AdminSay) " + message);
-
-			message = "Say bye-bye to stajs. Kicked in 20 seconds.";
-
-			ExecuteCommand("procon.protected.send", "admin.say", message, "all");
-			ExecuteCommand("procon.protected.chat.write", "(AdminSay) " + message);
-			ExecuteCommand("procon.protected.tasks.add", "TeamKillTracker", "20", "1", "1", "procon.protected.send", "admin.kickPlayer", strSoldierName, "Boot!");
-			//ExecuteCommand("procon.protected.send", "admin.kickPlayer", strSoldierName, "No more swapsies for you bro.");
-		}
+		#region IPRoConPluginInterface
 
 		public void OnPluginLoaded(string strHostName, string strPort, string strPRoConVersion)
 		{
@@ -88,6 +65,54 @@ namespace PRoConEvents
 		public void SetPluginVariable(string strVariable, string strValue)
 		{
 
+		}
+
+		#endregion
+
+		#region PRoConPluginAPI
+		public override void OnPlayerTeamChange(string strSoldierName, int iTeamID, int iSquadID)
+		{
+			if (strSoldierName != "stajs")
+				return;
+
+			const int maxSwaps = 2;
+
+			var count = 0;
+
+			lock (_lock)
+			{
+				if (_teamSwaps.TryGetValue(strSoldierName, out count))
+					count++;
+
+				_teamSwaps[strSoldierName] = count;
+			}
+
+			var swapsLeft = maxSwaps - count;
+			var message = string.Format("{0} joined team {1}, swaps remaining before kick: {2}", strSoldierName, iTeamID, swapsLeft);
+
+			ExecuteCommand("procon.protected.send", "admin.say", message, "all");
+			ExecuteCommand("procon.protected.chat.write", "(AdminSay) " + message);
+
+			if (swapsLeft > 0)
+				return;
+
+			message = "Say bye-bye to stajs. Kicked in 5 seconds.";
+
+			ExecuteCommand("procon.protected.send", "admin.say", message, "all");
+			ExecuteCommand("procon.protected.chat.write", "(AdminSay) " + message);
+			ExecuteCommand("procon.protected.tasks.add", "TeamKillTracker", "5", "1", "1", "procon.protected.send", "admin.kickPlayer", strSoldierName, "Boot!");
+		}
+
+		#endregion
+
+		private string ReplaceStaches(string s)
+		{
+			return s.Replace("{", "~(").Replace("}", ")~");
+		}
+
+		private void WriteConsole(string message)
+		{
+			ExecuteCommand("procon.protected.pluginconsole.write", ReplaceStaches(message));
 		}
 	}
 }
