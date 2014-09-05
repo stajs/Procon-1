@@ -14,7 +14,7 @@ namespace PRoConEvents
 
 		public void OnPluginLoaded(string strHostName, string strPort, string strPRoConVersion)
 		{
-			this.RegisterEvents(this.GetType().Name, "OnPlayerTeamChange");
+			this.RegisterEvents(this.GetType().Name, "OnPlayerJoin", "OnPlayerKilled");
 		}
 
 		public void OnPluginEnable()
@@ -70,12 +70,38 @@ namespace PRoConEvents
 		#endregion
 
 		#region PRoConPluginAPI
+
+		public override void OnPlayerJoin(string player)
+		{
+			lock (_lock)
+			{
+				_teamSwaps.Remove(player);
+			}
+
+			WriteConsole(player + " joined.");
+		}
+
+		public override void OnPlayerKilled(Kill kill) {
+			if (kill == null)
+				return;
+
+			if (kill.Victim == null)
+				return;
+
+			var victimName = kill.Victim.SoldierName;
+
+			if (string.IsNullOrEmpty(victimName) || victimName != "stajs")
+				return;
+
+			WriteConsole("stajs got wasted.");
+		}
+
 		public override void OnPlayerTeamChange(string strSoldierName, int iTeamID, int iSquadID)
 		{
 			if (strSoldierName != "stajs")
 				return;
 
-			const int maxSwaps = 2;
+			const int maxSwaps = 1;
 
 			var count = 0;
 
