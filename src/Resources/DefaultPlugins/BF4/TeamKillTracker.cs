@@ -1,211 +1,347 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using PRoCon.Core;
 using PRoCon.Core.Plugin;
 
 namespace PRoConEvents
 {
-    public class TeamKillTracker : PRoConPluginAPI, IPRoConPluginInterface
-    {
-        private static object _lock = new object();
-        private List<Killer> _killers = new List<Killer>();
+	public class TeamKillTracker : PRoConPluginAPI, IPRoConPluginInterface
+	{
+		private static object _lock = new object();
+		private List<TeamKill> _teamKills = new List<TeamKill>();
 
-        public class Killer
-        {
-            public string Name { get; set; }
-            public List<Victim> Victims { get; set; }
-        }
+		private enum TeamKillStatus
+		{
+			Pending,
+			Punished,
+			Forgiven,
+			AutoForgiven
+		}
 
-        public class Victim
-        {
-            public string Name { get; set; }
-            public int Count { get; set; }
-        }
+		private class TeamKill
+		{
+			public string KillerName { get; set; }
+			public string VictimName { get; set; }
+			public DateTime At { get; set; }
+			public TeamKillStatus Status { get; set; }
 
-        #region IPRoConPluginInterface
+		}
 
-        public void OnPluginLoaded(string strHostName, string strPort, string strPRoConVersion)
-        {
-            this.RegisterEvents(this.GetType().Name, "OnPlayerJoin", "OnPlayerKilled");
-        }
+		#region IPRoConPluginInterface
 
-        public void OnPluginEnable()
-        {
-            WriteConsole("^bTeam Kill Tracker:^n ^2Enabled.^0");
+		public void OnPluginLoaded(string strHostName, string strPort, string strPRoConVersion)
+		{
+			this.RegisterEvents(this.GetType().Name, "OnLevelLoaded", "OnLoadingLevel", "OnLevelStarted", "OnGlobalChat", "OnPlayerJoin", "OnPlayerKilled");
+		}
 
-            _killers = new List<Killer>();
-        }
+		public void OnPluginEnable()
+		{
+			WriteConsole("^2Enabled.^0");
 
-        public void OnPluginDisable()
-        {
-            WriteConsole("^bTeam Kill Tracker:^n ^8Disabled.^0");
-        }
+			_teamKills = new List<TeamKill>();
+		}
 
-        public string GetPluginName()
-        {
-            return "Team Kill Tracker";
-        }
+		public void OnPluginDisable()
+		{
+			WriteConsole("^8Disabled.^0");
+		}
 
-        public string GetPluginVersion()
-        {
-            return "0.1.0";
-        }
+		public string GetPluginName()
+		{
+			return "Team Kill Tracker";
+		}
 
-        public string GetPluginAuthor()
-        {
-            return "stajs";
-        }
+		public string GetPluginVersion()
+		{
+			return "0.1.0";
+		}
 
-        public string GetPluginWebsite()
-        {
-            return "http://battlelog.battlefield.com/bf4/soldier/stajs/stats/904562646/pc/";
-        }
+		public string GetPluginAuthor()
+		{
+			return "stajs";
+		}
 
-        public string GetPluginDescription()
-        {
-            return "Pure awesomeness.";
-        }
+		public string GetPluginWebsite()
+		{
+			return "http://battlelog.battlefield.com/bf4/soldier/stajs/stats/904562646/pc/";
+		}
 
-        public List<CPluginVariable> GetDisplayPluginVariables()
-        {
-            return GetPluginVariables();
-        }
+		public string GetPluginDescription()
+		{
+			return "Pure awesomeness.";
+		}
 
-        public List<CPluginVariable> GetPluginVariables()
-        {
-            return new List<CPluginVariable>();
-        }
+		public List<CPluginVariable> GetDisplayPluginVariables()
+		{
+			return GetPluginVariables();
+		}
 
-        public void SetPluginVariable(string strVariable, string strValue)
-        {
+		public List<CPluginVariable> GetPluginVariables()
+		{
+			return new List<CPluginVariable>();
+		}
 
-        }
+		public void SetPluginVariable(string strVariable, string strValue)
+		{
 
-        #endregion
+		}
 
-        #region PRoConPluginAPI
+		#endregion
 
-        public override void OnPlayerJoin(string player)
-        {
-            // TODO: Remove. For testing purposes, kill counts are reset on joining. Should be on round start.
-            lock (_lock)
-            {
-                _killers.RemoveAll(k => k.Name == player);
-            }
+		#region PRoConPluginAPI
 
-            WriteConsole(player + " joined.");
-        }
+		// TODO: Remove. Only for testing.
+		public override void OnGlobalChat(string speaker, string message)
+		{
+			// TODO: remove safety check.    
+			if (speaker != "stajs")
+				return;
 
-        public override void OnPlayerKilled(Kill kill)
-        {
-            var message = "Team Kill Tracker: OnPlayerKilled | ";
+			if (message == "!shame")
+				Shame();
 
-            if (kill == null || kill.Victim == null || kill.Killer == null)
-            {
-                WriteConsole(message + "Can not determine kill.");
-                return;
-            }
+			if (message.StartsWith("!add"))
+				Add(message);
+		}
 
-            var victimName = kill.Victim.SoldierName;
-            var killerName = kill.Killer.SoldierName;
+		// TODO: Remove. Only for testing.
+		private void Add(string message)
+		{
+			var parts = message.Split(new[] { " " }, StringSplitOptions.RemoveEmptyEntries);
 
-            // TODO: Remove safety check.
-            if (string.IsNullOrEmpty(victimName) || string.IsNullOrEmpty(killerName) || victimName != "stajs")
-            {
-                WriteConsole(message + "Can not determine name.");
-                return;
-            }
+			if (parts.Length != 3)
+				return;
 
-            // TODO: Uncomment. This is commented out to test fake TKs with suicides.
-            //if (kill.IsSuicide)
-            //{
-            //    WriteConsole(message + "Was suicide.");
-            //    return;
-            //}
+			var name = parts[1];
+			TeamKillStatus status;
 
-            var isTeamKill = kill.Killer.TeamID == kill.Victim.TeamID;
+			switch (parts[2])
+			{
+				case "a":
+					status = TeamKillStatus.AutoForgiven;
+					break;
 
-            if (!isTeamKill)
-            {
-                WriteConsole(message + "Not a TK.");
-                return;
-            }
+				case "f":
+					status = TeamKillStatus.Forgiven;
+					break;
 
-            var killer = _killers.FirstOrDefault(k => k.Name == killerName);
+				case "p":
+					status = TeamKillStatus.Punished;
+					break;
 
-            if (killer == null)
-            {
-                killer = new Killer
-                {
-                    Name = killerName,
-                    Victims = new List<Victim>()
-                };
+				default:
+					status = TeamKillStatus.Pending;
+					break;
+			}
 
-                _killers.Add(killer);
-            }
+			_teamKills.Add(new TeamKill
+			{
+				KillerName = name,
+				VictimName = "stajs",
+				At = DateTime.UtcNow,
+				Status = status
+			});
+		}
 
-            var victim = killer.Victims.FirstOrDefault(v => v.Name == victimName);
+		// TODO: Auto-shame on round end.
+		private void Shame()
+		{
+			var worstTeamKillers = _teamKills
+				 .GroupBy(tk => tk.KillerName)
+				 .Select(g => new
+				 {
+					 KillerName = g.Key,
+					 Count = g.Count(),
+					 TeamKills = g
+				 })
+				 .OrderByDescending(a => a.Count)
+				 .Take(3)
+				 .ToList();
 
-            if (victim == null)
-            {
-                victim = new Victim
-                {
-                    Name = victimName,
-                    Count = 0
-                };
+			if (!worstTeamKillers.Any())
+			{
+				AdminSayAll("Wow! We got through a round without a single teamkill!");
+				return;
+			}
 
-                killer.Victims.Add(victim);
-            }
+			var sb = new StringBuilder();
 
-            victim.Count++;
+			for (int i = 0; i < worstTeamKillers.Count; i++)
+			{
+				var killer = worstTeamKillers[i];
 
-            WriteConsole(string.Format("{0}{1} has TK'd {2} {3} times.", message, killerName, victimName, victim.Count));
-        }
+				sb.AppendFormat("{0} ({1}){2}",
+					  killer.KillerName,
+					  killer.Count,
+					  i + 1 < worstTeamKillers.Count ? ", " : ".");
+			}
 
-        //public override void OnPlayerTeamChange(string strSoldierName, int iTeamID, int iSquadID)
-        //{
-        //    if (strSoldierName != "stajs")
-        //        return;
+			AdminSayAll("Worst team killers: " + sb);
+		}
 
-        //    const int maxSwaps = 1;
+		public override void OnLoadingLevel(string mapFileName, int roundsPlayed, int roundsTotal)
+		{
+			WriteConsole("OnLoadingLevel " + mapFileName);
+		}
 
-        //    var count = 0;
+		public override void OnLevelLoaded(string mapFileName, string gamemode, int roundsPlayed, int roundsTotal)
+		{
+			WriteConsole("OnLevelLoaded " + mapFileName + ", " + gamemode);
+		}
 
-        //    lock (_lock)
-        //    {
-        //        if (_teamSwaps.TryGetValue(strSoldierName, out count))
-        //            count++;
+		// TODO: Confirm that this is round start.
+		public override void OnLevelStarted()
+		{
+			WriteConsole("OnLevelStarted()");
 
-        //        _teamSwaps[strSoldierName] = count;
-        //    }
+			lock (_lock)
+			{
+				_teamKills = new List<TeamKill>();
+			}
+		}
 
-        //    var swapsLeft = maxSwaps - count;
-        //    var message = string.Format("{0} joined team {1}, swaps remaining before kick: {2}", strSoldierName, iTeamID, swapsLeft);
+		private void AutoForgive(string killer, string victim)
+		{
+			_teamKills
+				.Where(tk => tk.KillerName == killer && tk.VictimName == victim && tk.Status == TeamKillStatus.Pending)
+				.ToList()
+				.ForEach(tk => tk.Status = TeamKillStatus.AutoForgiven);
+		}
 
-        //    ExecuteCommand("procon.protected.send", "admin.say", message, "all");
-        //    ExecuteCommand("procon.protected.chat.write", "(AdminSay) " + message);
+		public override void OnPlayerKilled(Kill kill)
+		{
+			const string prefix = "OnPlayerKilled | ";
 
-        //    if (swapsLeft > 0)
-        //        return;
+			if (kill == null || kill.Victim == null || kill.Killer == null)
+			{
+				WriteConsole(prefix + "Can not determine kill.");
+				return;
+			}
 
-        //    message = "Say bye-bye to stajs. Kicked in 5 seconds.";
+			var victimName = kill.Victim.SoldierName;
+			var killerName = kill.Killer.SoldierName;
 
-        //    ExecuteCommand("procon.protected.send", "admin.say", message, "all");
-        //    ExecuteCommand("procon.protected.chat.write", "(AdminSay) " + message);
-        //    ExecuteCommand("procon.protected.tasks.add", "TeamKillTracker", "5", "1", "1", "procon.protected.send", "admin.kickPlayer", strSoldierName, "Boot!");
-        //}
+			// TODO: Remove safety check.
+			if (string.IsNullOrEmpty(victimName) || string.IsNullOrEmpty(killerName) || victimName != "stajs")
+			{
+				WriteConsole(prefix + "Can not determine name.");
+				return;
+			}
 
-        #endregion
+			// TODO: Uncomment. This is commented out to test fake TKs with suicides.
+			//if (kill.IsSuicide)
+			//{
+			//    WriteConsole(message + "Was suicide.");
+			//    return;
+			//}
 
-        private string ReplaceStaches(string s)
-        {
-            return s.Replace("{", "~(").Replace("}", ")~");
-        }
+			var isTeamKill = kill.Killer.TeamID == kill.Victim.TeamID;
 
-        private void WriteConsole(string message)
-        {
-            ExecuteCommand("procon.protected.pluginconsole.write", ReplaceStaches(message));
-        }
-    }
+			if (!isTeamKill)
+			{
+				WriteConsole(prefix + "Not a TK.");
+				return;
+			}
+
+			// Auto-forgive any previous pending TKs.
+			AutoForgive(killerName, victimName);
+
+			_teamKills.Add(new TeamKill
+			{
+				KillerName = killerName,
+				VictimName = victimName,
+				At = DateTime.UtcNow,
+				Status = TeamKillStatus.Pending
+			});
+
+			var allKillsByKiller = _teamKills
+				.Where(tk => tk.KillerName == killerName)
+				.ToList();
+
+			const int maxPunish = 5;
+			var totalPunishedCount = allKillsByKiller.Count(tk => tk.Status == TeamKillStatus.Punished);
+			var punishesLeft = maxPunish - totalPunishedCount;
+
+			var message = string.Format("{0} TEAMKILLED {1}. Watch your fire dum-dum! {0} has TK'd a total of {2} time{3}.",
+				killerName,
+				victimName,
+				allKillsByKiller.Count,
+				allKillsByKiller.Count == 1 ? string.Empty : "s"
+				);
+
+			AdminSayPlayer(killerName, message);
+			AdminSayPlayer(victimName, message);
+
+			var victimKillsByKiller = allKillsByKiller
+				.Where(tk => tk.VictimName == victimName)
+				.ToList();
+
+			var killedVictimCount = victimKillsByKiller.Count;
+			var punishedCount = victimKillsByKiller.Count(tk => tk.Status == TeamKillStatus.Punished);
+			var forgivenCount = victimKillsByKiller.Count(tk => tk.Status == TeamKillStatus.Forgiven);
+			var autoForgivenCount = victimKillsByKiller.Count(tk => tk.Status == TeamKillStatus.AutoForgiven);
+
+			var sb = new StringBuilder(victimName + ": !p to punish, !f to forgive.");
+
+			if (killedVictimCount == 0)
+			{
+				sb.AppendFormat(" This is the first time {0} has TK'd you.", killerName);
+			}
+			else
+			{
+				sb.AppendFormat(" Stats - {0} has TK'd you: {1}", killerName, killedVictimCount);
+
+				if (punishedCount > 0)
+					sb.AppendFormat(", punished: {0}", punishedCount);
+
+				if (forgivenCount > 0)
+					sb.AppendFormat(", forgiven: {0}", forgivenCount);
+
+				if (autoForgivenCount > 0)
+					sb.AppendFormat(", auto-forgiven: {0}", autoForgivenCount);
+
+				sb.Append(".");
+			}
+
+			AdminSayPlayer(victimName, sb.ToString());
+		}
+
+		//    ExecuteCommand("procon.protected.tasks.add", "TeamKillTracker", "5", "1", "1", "procon.protected.send", "admin.kickPlayer", strSoldierName, "Boot!");
+
+		#endregion
+
+		private string ReplaceStaches(string s)
+		{
+			return s.Replace("{", "~(").Replace("}", ")~");
+		}
+
+		private void WriteConsole(string message)
+		{
+			ExecuteCommand("procon.protected.pluginconsole.write", "Team Kill Tracker: " + ReplaceStaches(message));
+		}
+
+		private void AdminSayAll(string format, params object[] args)
+		{
+			AdminSayAll(string.Format(format, args));
+		}
+
+		private void AdminSayAll(string message)
+		{
+			ExecuteCommand("procon.protected.send", "admin.say", message, "all");
+			ExecuteCommand("procon.protected.chat.write", "(AdminSay) " + message);
+		}
+
+		private void AdminSayPlayer(string player, string format, params object[] args)
+		{
+			AdminSayPlayer(player, string.Format(format, args));
+		}
+
+		private void AdminSayPlayer(string player, string message)
+		{
+			ExecuteCommand("procon.protected.send", "admin.say", message, "player", player);
+			ExecuteCommand("procon.protected.chat.write", "(AdminSay) " + message);
+		}
+	}
 }
