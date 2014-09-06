@@ -33,7 +33,7 @@ namespace PRoConEvents
 
 		public void OnPluginLoaded(string strHostName, string strPort, string strPRoConVersion)
 		{
-			this.RegisterEvents(this.GetType().Name, "OnLevelLoaded", "OnLoadingLevel", "OnLevelStarted", "OnGlobalChat", "OnPlayerJoin", "OnPlayerKilled");
+			this.RegisterEvents(this.GetType().Name, "OnLevelLoaded", "OnLoadingLevel", "OnLevelStarted", "OnRoundOver", "OnGlobalChat", "OnPlayerKilled");
 		}
 
 		public void OnPluginEnable()
@@ -70,7 +70,7 @@ namespace PRoConEvents
 
 		public string GetPluginDescription()
 		{
-			return "Pure awesomeness.";
+			return "<h1>Pure awesomeness</h1>";
 		}
 
 		public List<CPluginVariable> GetDisplayPluginVariables()
@@ -93,6 +93,7 @@ namespace PRoConEvents
 		#region PRoConPluginAPI
 
 		// TODO: Remove. Only for testing.
+		// TODO: Implement punish/forgive on global/team/squad chat.
 		public override void OnGlobalChat(string speaker, string message)
 		{
 			// TODO: remove safety check.    
@@ -145,7 +146,6 @@ namespace PRoConEvents
 			});
 		}
 
-		// TODO: Auto-shame on round end.
 		private void Shame()
 		{
 			var worstTeamKillers = _teamKills
@@ -200,6 +200,11 @@ namespace PRoConEvents
 			{
 				_teamKills = new List<TeamKill>();
 			}
+		}
+
+		public override void OnRoundOver(int winningTeamId)
+		{
+			Shame();
 		}
 
 		private void AutoForgive(string killer, string victim)
@@ -260,9 +265,11 @@ namespace PRoConEvents
 				.Where(tk => tk.KillerName == killerName)
 				.ToList();
 
-			const int maxPunish = 5;
-			var totalPunishedCount = allKillsByKiller.Count(tk => tk.Status == TeamKillStatus.Punished);
-			var punishesLeft = maxPunish - totalPunishedCount;
+			// TODO: auto kill/kick.
+			//const int maxPunish = 5;
+			//var totalPunishedCount = allKillsByKiller.Count(tk => tk.Status == TeamKillStatus.Punished);
+			//var punishesLeft = maxPunish - totalPunishedCount;
+			//    ExecuteCommand("procon.protected.tasks.add", "TeamKillTracker", "5", "1", "1", "procon.protected.send", "admin.kickPlayer", strSoldierName, "Boot!");
 
 			var message = string.Format("{0} TEAMKILLED {1}. Watch your fire dum-dum! {0} has TK'd a total of {2} time{3}.",
 				killerName,
@@ -308,8 +315,6 @@ namespace PRoConEvents
 			AdminSayPlayer(victimName, sb.ToString());
 		}
 
-		//    ExecuteCommand("procon.protected.tasks.add", "TeamKillTracker", "5", "1", "1", "procon.protected.send", "admin.kickPlayer", strSoldierName, "Boot!");
-
 		#endregion
 
 		private string ReplaceStaches(string s)
@@ -322,26 +327,16 @@ namespace PRoConEvents
 			ExecuteCommand("procon.protected.pluginconsole.write", "Team Kill Tracker: " + ReplaceStaches(message));
 		}
 
-		private void AdminSayAll(string format, params object[] args)
-		{
-			AdminSayAll(string.Format(format, args));
-		}
-
 		private void AdminSayAll(string message)
 		{
 			ExecuteCommand("procon.protected.send", "admin.say", message, "all");
-			ExecuteCommand("procon.protected.chat.write", "(AdminSay) " + message);
-		}
-
-		private void AdminSayPlayer(string player, string format, params object[] args)
-		{
-			AdminSayPlayer(player, string.Format(format, args));
+			ExecuteCommand("procon.protected.chat.write", "(AdminSayAll) " + message);
 		}
 
 		private void AdminSayPlayer(string player, string message)
 		{
 			ExecuteCommand("procon.protected.send", "admin.say", message, "player", player);
-			ExecuteCommand("procon.protected.chat.write", "(AdminSay) " + message);
+			ExecuteCommand("procon.protected.chat.write", "(AdminSayPlayer " + player + ") " + message);
 		}
 	}
 }
