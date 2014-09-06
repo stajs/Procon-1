@@ -11,6 +11,7 @@ namespace PRoConEvents
 	{
 		private static object _lock = new object();
 		private List<TeamKill> _teamKills = new List<TeamKill>();
+		private TimeSpan _punishWindowLength = TimeSpan.FromSeconds(45);
 
 		private enum TeamKillStatus
 		{
@@ -33,7 +34,19 @@ namespace PRoConEvents
 
 		public void OnPluginLoaded(string strHostName, string strPort, string strPRoConVersion)
 		{
-			this.RegisterEvents(this.GetType().Name, "OnLevelLoaded", "OnLoadingLevel", "OnLevelStarted", "OnRoundOver", "OnGlobalChat", "OnPlayerKilled");
+			var events = new[]
+			{
+				"OnLevelLoaded",
+				"OnLoadingLevel",
+				"OnLevelStarted",
+				"OnRoundOver",
+				"OnPlayerKilled",
+				"OnGlobalChat",
+				"OnTeamChat",
+				"OnSquadChat"	
+			};
+
+			this.RegisterEvents(this.GetType().Name, events);
 		}
 
 		public void OnPluginEnable()
@@ -92,93 +105,19 @@ namespace PRoConEvents
 
 		#region PRoConPluginAPI
 
-		// TODO: Remove. Only for testing.
-		// TODO: Implement punish/forgive on global/team/squad chat.
 		public override void OnGlobalChat(string speaker, string message)
 		{
-			// TODO: remove safety check.    
-			if (speaker != "stajs")
-				return;
-
-			if (message == "!shame")
-				Shame();
-
-			if (message.StartsWith("!add"))
-				Add(message);
+			OnChat(speaker, message);
 		}
 
-		// TODO: Remove. Only for testing.
-		private void Add(string message)
+		public override void OnTeamChat(string speaker, string message, int teamId)
 		{
-			var parts = message.Split(new[] { " " }, StringSplitOptions.RemoveEmptyEntries);
-
-			if (parts.Length != 3)
-				return;
-
-			var name = parts[1];
-			TeamKillStatus status;
-
-			switch (parts[2])
-			{
-				case "a":
-					status = TeamKillStatus.AutoForgiven;
-					break;
-
-				case "f":
-					status = TeamKillStatus.Forgiven;
-					break;
-
-				case "p":
-					status = TeamKillStatus.Punished;
-					break;
-
-				default:
-					status = TeamKillStatus.Pending;
-					break;
-			}
-
-			_teamKills.Add(new TeamKill
-			{
-				KillerName = name,
-				VictimName = "stajs",
-				At = DateTime.UtcNow,
-				Status = status
-			});
+			OnChat(speaker, message);
 		}
 
-		private void Shame()
+		public override void OnSquadChat(string speaker, string message, int teamId, int squadId)
 		{
-			var worstTeamKillers = _teamKills
-				 .GroupBy(tk => tk.KillerName)
-				 .Select(g => new
-				 {
-					 KillerName = g.Key,
-					 Count = g.Count(),
-					 TeamKills = g
-				 })
-				 .OrderByDescending(a => a.Count)
-				 .Take(3)
-				 .ToList();
-
-			if (!worstTeamKillers.Any())
-			{
-				AdminSayAll("Wow! We got through a round without a single teamkill!");
-				return;
-			}
-
-			var sb = new StringBuilder();
-
-			for (int i = 0; i < worstTeamKillers.Count; i++)
-			{
-				var killer = worstTeamKillers[i];
-
-				sb.AppendFormat("{0} ({1}){2}",
-					  killer.KillerName,
-					  killer.Count,
-					  i + 1 < worstTeamKillers.Count ? ", " : ".");
-			}
-
-			AdminSayAll("Worst team killers: " + sb);
+			OnChat(speaker, message);
 		}
 
 		public override void OnLoadingLevel(string mapFileName, int roundsPlayed, int roundsTotal)
@@ -194,7 +133,7 @@ namespace PRoConEvents
 		// TODO: Confirm that this is round start.
 		public override void OnLevelStarted()
 		{
-			WriteConsole("OnLevelStarted()");
+			WriteConsole("OnLevelStarted");
 
 			lock (_lock)
 			{
@@ -207,15 +146,14 @@ namespace PRoConEvents
 			Shame();
 		}
 
-		private void AutoForgive(string killer, string victim)
+		public override void OnPlayerKilled(Kill kill)
 		{
-			_teamKills
-				.Where(tk => tk.KillerName == killer && tk.VictimName == victim && tk.Status == TeamKillStatus.Pending)
-				.ToList()
-				.ForEach(tk => tk.Status = TeamKillStatus.AutoForgiven);
+			UpdateTeamKills(kill);
 		}
 
-		public override void OnPlayerKilled(Kill kill)
+		#endregion
+
+		private void UpdateTeamKills(Kill kill)
 		{
 			const string prefix = "OnPlayerKilled | ";
 
@@ -290,7 +228,8 @@ namespace PRoConEvents
 			var forgivenCount = victimKillsByKiller.Count(tk => tk.Status == TeamKillStatus.Forgiven);
 			var autoForgivenCount = victimKillsByKiller.Count(tk => tk.Status == TeamKillStatus.AutoForgiven);
 
-			var sb = new StringBuilder(victimName + ": !p to punish, !f to forgive.");
+			//TODO: remove extra !. Currently there to avoid conflicting with PRoconRulz.
+			var sb = new StringBuilder(victimName + ": !!p to punish, !!f to forgive.");
 
 			if (killedVictimCount == 0)
 			{
@@ -315,7 +254,171 @@ namespace PRoConEvents
 			AdminSayPlayer(victimName, sb.ToString());
 		}
 
-		#endregion
+		private void OnChat(string speaker, string message)
+		{
+			// TODO: remove safety check.    
+			if (speaker != "stajs")
+				return;
+
+			if (message == "!!shame")
+				Shame();
+
+			if (message.StartsWith("!!add"))
+				Add(message);
+
+			if (message == ("!!p"))
+				PunishKillerOf(speaker);
+
+			if (message == ("!!f"))
+				ForgiveKillerOf(speaker);
+		}
+
+		private void PunishKillerOf(string victim)
+		{
+			AutoForgivePastPunishWindow();
+
+			var kills = _teamKills
+				.Where(tk => tk.Status == TeamKillStatus.Pending && tk.VictimName == victim)
+				.ToList();
+
+			if (!kills.Any())
+				AdminSayPlayer(victim, "Could not find player to punish.");
+
+			if (kills.Count > 1)
+				WriteConsole("Players found to punish: " + kills.Count);
+
+			foreach (var kill in kills)
+				Punish(kill);
+		}
+
+		private void ForgiveKillerOf(string victim)
+		{
+			AutoForgivePastPunishWindow();
+
+			var kills = _teamKills
+				.Where(tk => tk.Status == TeamKillStatus.Pending && tk.VictimName == victim)
+				.ToList();
+
+			if (!kills.Any())
+				AdminSayPlayer(victim, "Could not find player to forgive.");
+
+			if (kills.Count > 1)
+				WriteConsole("Players found to forgive: " + kills.Count);
+
+			foreach (var kill in kills)
+				Forgive(kill);
+		}
+
+		private void Punish(TeamKill teamKill)
+		{
+			var message = string.Format("Punished {0}.", teamKill.KillerName);
+
+			//TODO: protect admins.
+			ExecuteCommand("procon.protected.send", "admin.killPlayer", teamKill.KillerName);
+			AdminSayPlayer(teamKill.KillerName, message);
+			AdminSayPlayer(teamKill.VictimName, message);
+			teamKill.Status = TeamKillStatus.Punished;
+		}
+
+		private void Forgive(TeamKill teamKill)
+		{
+			var message = string.Format("Forgiven {0}.", teamKill.KillerName);
+
+			AdminSayPlayer(teamKill.KillerName, message);
+			AdminSayPlayer(teamKill.VictimName, message);
+			teamKill.Status = TeamKillStatus.Forgiven;
+		}
+
+		private void AutoForgivePastPunishWindow()
+		{
+			var punishWindowStart = DateTime.UtcNow.Add(_punishWindowLength.Negate());
+
+			_teamKills
+				.Where(tk => tk.Status == TeamKillStatus.Pending && tk.At < punishWindowStart)
+				.ToList()
+				.ForEach(tk => tk.Status = TeamKillStatus.AutoForgiven);
+		}
+
+		private void AutoForgive(string killer, string victim)
+		{
+			_teamKills
+				.Where(tk => tk.KillerName == killer && tk.VictimName == victim && tk.Status == TeamKillStatus.Pending)
+				.ToList()
+				.ForEach(tk => tk.Status = TeamKillStatus.AutoForgiven);
+		}
+		private void Shame()
+		{
+			var worstTeamKillers = _teamKills
+				 .GroupBy(tk => tk.KillerName)
+				 .Select(g => new
+				 {
+					 KillerName = g.Key,
+					 Count = g.Count(),
+					 TeamKills = g
+				 })
+				 .OrderByDescending(a => a.Count)
+				 .Take(3)
+				 .ToList();
+
+			if (!worstTeamKillers.Any())
+			{
+				AdminSayAll("Wow! We got through a round without a single teamkill!");
+				return;
+			}
+
+			var sb = new StringBuilder();
+
+			for (int i = 0; i < worstTeamKillers.Count; i++)
+			{
+				var killer = worstTeamKillers[i];
+
+				sb.AppendFormat("{0} ({1}){2}",
+					  killer.KillerName,
+					  killer.Count,
+					  i + 1 < worstTeamKillers.Count ? ", " : ".");
+			}
+
+			AdminSayAll("Worst team killers: " + sb);
+		}
+
+		// TODO: Remove. Only for testing.
+		private void Add(string message)
+		{
+			var parts = message.Split(new[] { " " }, StringSplitOptions.RemoveEmptyEntries);
+
+			if (parts.Length != 3)
+				return;
+
+			var name = parts[1];
+			TeamKillStatus status;
+
+			switch (parts[2])
+			{
+				case "a":
+					status = TeamKillStatus.AutoForgiven;
+					break;
+
+				case "f":
+					status = TeamKillStatus.Forgiven;
+					break;
+
+				case "p":
+					status = TeamKillStatus.Punished;
+					break;
+
+				default:
+					status = TeamKillStatus.Pending;
+					break;
+			}
+
+			_teamKills.Add(new TeamKill
+			{
+				KillerName = name,
+				VictimName = "stajs",
+				At = DateTime.UtcNow,
+				Status = status
+			});
+		}
 
 		private string ReplaceStaches(string s)
 		{
