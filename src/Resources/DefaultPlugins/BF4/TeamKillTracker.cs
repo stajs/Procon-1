@@ -148,20 +148,35 @@ namespace PRoConEvents
 
 		public override void OnPlayerKilled(Kill kill)
 		{
-			UpdateTeamKills(kill);
+			OnTeamKill(kill);
 		}
 
 		#endregion
 
-		private void UpdateTeamKills(Kill kill)
+		private void AutoForgive(string killer, string victim)
 		{
-			const string prefix = "OnPlayerKilled | ";
+			_teamKills
+				.Where(tk => tk.KillerName == killer && tk.VictimName == victim && tk.Status == TeamKillStatus.Pending)
+				.ToList()
+				.ForEach(tk => tk.Status = TeamKillStatus.AutoForgiven);
+		}
+
+		private void OnTeamKill(Kill kill)
+		{
+			const string prefix = "OnTeamKill | ";
 
 			if (kill == null || kill.Victim == null || kill.Killer == null)
 			{
 				WriteConsole(prefix + "Can not determine kill.");
 				return;
 			}
+
+			// TODO: Uncomment. This is commented out to test fake TKs with suicides.
+			//if (kill.IsSuicide)
+			//{
+			//    WriteConsole(message + "Was suicide.");
+			//    return;
+			//}
 
 			var victimName = kill.Victim.SoldierName;
 			var killerName = kill.Killer.SoldierName;
@@ -173,13 +188,6 @@ namespace PRoConEvents
 				return;
 			}
 
-			// TODO: Uncomment. This is commented out to test fake TKs with suicides.
-			//if (kill.IsSuicide)
-			//{
-			//    WriteConsole(message + "Was suicide.");
-			//    return;
-			//}
-
 			var isTeamKill = kill.Killer.TeamID == kill.Victim.TeamID;
 
 			if (!isTeamKill)
@@ -188,7 +196,7 @@ namespace PRoConEvents
 				return;
 			}
 
-			// Auto-forgive any previous pending TKs.
+			// Auto-forgive any previous pending TKs for this killer and victim.
 			AutoForgive(killerName, victimName);
 
 			_teamKills.Add(new TeamKill
@@ -202,12 +210,6 @@ namespace PRoConEvents
 			var allKillsByKiller = _teamKills
 				.Where(tk => tk.KillerName == killerName)
 				.ToList();
-
-			// TODO: auto kill/kick.
-			//const int maxPunish = 5;
-			//var totalPunishedCount = allKillsByKiller.Count(tk => tk.Status == TeamKillStatus.Punished);
-			//var punishesLeft = maxPunish - totalPunishedCount;
-			//    ExecuteCommand("procon.protected.tasks.add", "TeamKillTracker", "5", "1", "1", "procon.protected.send", "admin.kickPlayer", strSoldierName, "Boot!");
 
 			var message = string.Format("{0} TEAMKILLED {1}. Watch your fire dum-dum! {0} has TK'd a total of {2} time{3}.",
 				killerName,
@@ -223,7 +225,6 @@ namespace PRoConEvents
 				.Where(tk => tk.VictimName == victimName)
 				.ToList();
 
-			var killedVictimCount = victimKillsByKiller.Count;
 			var punishedCount = victimKillsByKiller.Count(tk => tk.Status == TeamKillStatus.Punished);
 			var forgivenCount = victimKillsByKiller.Count(tk => tk.Status == TeamKillStatus.Forgiven);
 			var autoForgivenCount = victimKillsByKiller.Count(tk => tk.Status == TeamKillStatus.AutoForgiven);
@@ -231,13 +232,13 @@ namespace PRoConEvents
 			//TODO: remove extra !. Currently there to avoid conflicting with PRoconRulz.
 			var sb = new StringBuilder(victimName + ": !!p to punish, !!f to forgive.");
 
-			if (killedVictimCount == 0)
+			if (victimKillsByKiller.Count == 0)
 			{
 				sb.AppendFormat(" This is the first time {0} has TK'd you.", killerName);
 			}
 			else
 			{
-				sb.AppendFormat(" Stats - {0} has TK'd you: {1}", killerName, killedVictimCount);
+				sb.AppendFormat(" Previous stats - TK's by {0} on you: {1}", killerName, victimKillsByKiller.Count);
 
 				if (punishedCount > 0)
 					sb.AppendFormat(", punished: {0}", punishedCount);
@@ -273,13 +274,28 @@ namespace PRoConEvents
 				ForgiveKillerOf(speaker);
 		}
 
+		private void AutoForgivePastPunishWindow()
+		{
+			var punishWindowStart = DateTime.UtcNow.Add(_punishWindowLength.Negate());
+
+			_teamKills
+				.Where(tk => tk.Status == TeamKillStatus.Pending && tk.At < punishWindowStart)
+				.ToList()
+				.ForEach(tk => tk.Status = TeamKillStatus.AutoForgiven);
+		}
+
+		private List<TeamKill> GetPendingTeamKillsForVictim(string victim)
+		{
+			return _teamKills
+				.Where(tk => tk.Status == TeamKillStatus.Pending && tk.VictimName == victim)
+				.ToList();
+		}
+
 		private void PunishKillerOf(string victim)
 		{
 			AutoForgivePastPunishWindow();
 
-			var kills = _teamKills
-				.Where(tk => tk.Status == TeamKillStatus.Pending && tk.VictimName == victim)
-				.ToList();
+			var kills = GetPendingTeamKillsForVictim(victim);
 
 			if (!kills.Any())
 				AdminSayPlayer(victim, "Could not find player to punish.");
@@ -295,9 +311,7 @@ namespace PRoConEvents
 		{
 			AutoForgivePastPunishWindow();
 
-			var kills = _teamKills
-				.Where(tk => tk.Status == TeamKillStatus.Pending && tk.VictimName == victim)
-				.ToList();
+			var kills = GetPendingTeamKillsForVictim(victim);
 
 			if (!kills.Any())
 				AdminSayPlayer(victim, "Could not find player to forgive.");
@@ -313,7 +327,13 @@ namespace PRoConEvents
 		{
 			var message = string.Format("Punished {0}.", teamKill.KillerName);
 
-			//TODO: protect admins.
+			// TODO: protect admins.
+			// TODO: auto kick.
+			//const int maxPunish = 5;
+			//var totalPunishedCount = allKillsByKiller.Count(tk => tk.Status == TeamKillStatus.Punished);
+			//var punishesLeft = maxPunish - totalPunishedCount;
+			//    ExecuteCommand("procon.protected.tasks.add", "TeamKillTracker", "5", "1", "1", "procon.protected.send", "admin.kickPlayer", strSoldierName, "Boot!");
+			
 			ExecuteCommand("procon.protected.send", "admin.killPlayer", teamKill.KillerName);
 			AdminSayPlayer(teamKill.KillerName, message);
 			AdminSayPlayer(teamKill.VictimName, message);
@@ -329,23 +349,6 @@ namespace PRoConEvents
 			teamKill.Status = TeamKillStatus.Forgiven;
 		}
 
-		private void AutoForgivePastPunishWindow()
-		{
-			var punishWindowStart = DateTime.UtcNow.Add(_punishWindowLength.Negate());
-
-			_teamKills
-				.Where(tk => tk.Status == TeamKillStatus.Pending && tk.At < punishWindowStart)
-				.ToList()
-				.ForEach(tk => tk.Status = TeamKillStatus.AutoForgiven);
-		}
-
-		private void AutoForgive(string killer, string victim)
-		{
-			_teamKills
-				.Where(tk => tk.KillerName == killer && tk.VictimName == victim && tk.Status == TeamKillStatus.Pending)
-				.ToList()
-				.ForEach(tk => tk.Status = TeamKillStatus.AutoForgiven);
-		}
 		private void Shame()
 		{
 			var worstTeamKillers = _teamKills
@@ -427,17 +430,20 @@ namespace PRoConEvents
 
 		private void WriteConsole(string message)
 		{
-			ExecuteCommand("procon.protected.pluginconsole.write", "Team Kill Tracker: " + ReplaceStaches(message));
+			message = ReplaceStaches(message);
+			ExecuteCommand("procon.protected.pluginconsole.write", "Team Kill Tracker: " + message);
 		}
 
 		private void AdminSayAll(string message)
 		{
+			message = ReplaceStaches(message);
 			ExecuteCommand("procon.protected.send", "admin.say", message, "all");
 			ExecuteCommand("procon.protected.chat.write", "(AdminSayAll) " + message);
 		}
 
 		private void AdminSayPlayer(string player, string message)
 		{
+			message = ReplaceStaches(message);
 			ExecuteCommand("procon.protected.send", "admin.say", message, "player", player);
 			ExecuteCommand("procon.protected.chat.write", "(AdminSayPlayer " + player + ") " + message);
 		}
