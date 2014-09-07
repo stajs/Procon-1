@@ -249,33 +249,21 @@ namespace PRoConEvents
 			const string prefix = "OnTeamKill | ";
 
 			if (kill == null || kill.Victim == null || kill.Killer == null)
-			{
-				WriteConsole(prefix + "Can not determine kill.");
 				return;
-			}
 
 			if (kill.IsSuicide)
-			{
-				WriteConsole(prefix + "Was suicide.");
 				return;
-			}
 
 			var victimName = kill.Victim.SoldierName;
 			var killerName = kill.Killer.SoldierName;
 
 			if (string.IsNullOrEmpty(victimName) || string.IsNullOrEmpty(killerName))
-			{
-				WriteConsole(prefix + "Can not determine name.");
 				return;
-			}
 
 			var isTeamKill = kill.Killer.TeamID == kill.Victim.TeamID;
 
 			if (!isTeamKill)
-			{
-				WriteConsole(prefix + "Not a TK.");
 				return;
-			}
 
 			// Auto-forgive any previous pending TKs for this killer and victim - there should only be one pending
 			// at a time for this combination, and it's about to be added.
