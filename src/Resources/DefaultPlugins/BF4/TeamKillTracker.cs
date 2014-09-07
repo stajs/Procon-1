@@ -43,7 +43,7 @@ namespace PRoConEvents
 				"OnPlayerKilled",
 				"OnGlobalChat",
 				"OnTeamChat",
-				"OnSquadChat"	
+				"OnSquadChat"
 			};
 
 			this.RegisterEvents(this.GetType().Name, events);
@@ -51,9 +51,8 @@ namespace PRoConEvents
 
 		public void OnPluginEnable()
 		{
-			WriteConsole("^2Enabled.^0");
-
 			_teamKills = new List<TeamKill>();
+			WriteConsole("^2Enabled.^0");
 		}
 
 		public void OnPluginDisable()
@@ -323,30 +322,43 @@ namespace PRoConEvents
 				Forgive(kill);
 		}
 
-		private void Punish(TeamKill teamKill)
+		private bool IsAdmin(string player)
 		{
-			var message = string.Format("Punished {0}.", teamKill.KillerName);
+			var privileges = GetAccountPrivileges(player);
 
-			// TODO: protect admins.
+			if (privileges == null)
+				return false;
+
+			return privileges.CanKillPlayers;
+		}
+
+		private void Punish(TeamKill kill)
+		{
+			var message = string.Format("Punished {0}.", kill.KillerName);
+
 			// TODO: auto kick.
 			//const int maxPunish = 5;
 			//var totalPunishedCount = allKillsByKiller.Count(tk => tk.Status == TeamKillStatus.Punished);
 			//var punishesLeft = maxPunish - totalPunishedCount;
 			//    ExecuteCommand("procon.protected.tasks.add", "TeamKillTracker", "5", "1", "1", "procon.protected.send", "admin.kickPlayer", strSoldierName, "Boot!");
-			
-			ExecuteCommand("procon.protected.send", "admin.killPlayer", teamKill.KillerName);
-			AdminSayPlayer(teamKill.KillerName, message);
-			AdminSayPlayer(teamKill.VictimName, message);
-			teamKill.Status = TeamKillStatus.Punished;
+
+			AdminSayPlayer(kill.KillerName, message);
+			AdminSayPlayer(kill.VictimName, message);
+			kill.Status = TeamKillStatus.Punished;
+
+			if (IsAdmin(kill.KillerName))
+				AdminSayPlayer(kill.KillerName, "Protected from kill.");
+			else
+				ExecuteCommand("procon.protected.send", "admin.killPlayer", kill.KillerName);
 		}
 
-		private void Forgive(TeamKill teamKill)
+		private void Forgive(TeamKill kill)
 		{
-			var message = string.Format("Forgiven {0}.", teamKill.KillerName);
+			var message = string.Format("Forgiven {0}.", kill.KillerName);
 
-			AdminSayPlayer(teamKill.KillerName, message);
-			AdminSayPlayer(teamKill.VictimName, message);
-			teamKill.Status = TeamKillStatus.Forgiven;
+			AdminSayPlayer(kill.KillerName, message);
+			AdminSayPlayer(kill.VictimName, message);
+			kill.Status = TeamKillStatus.Forgiven;
 		}
 
 		private void Shame()
