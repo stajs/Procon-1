@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
-using System.Security.Policy;
 using System.Text;
 using System.Text.RegularExpressions;
 using PRoCon.Core;
@@ -14,6 +12,8 @@ namespace PRoConEvents
 	{
 		private static object _lock = new object();
 		private List<TeamKill> _teamKills = new List<TeamKill>();
+		private const int PunishWindowMin = 20;
+		private const int PunishWindowMax = 120;
 		private TimeSpan _punishWindow = TimeSpan.FromSeconds(45);
 		private string _victimAndKillerNotice = "{killer} TEAMKILLED {victim}. Watch your fire dum-dum! {killer} has TK'd a total of {killCount} {killCount:time|times}.";
 		private enumBoolYesNo _showStatsOnVictimPrompt = enumBoolYesNo.Yes;
@@ -98,12 +98,12 @@ namespace PRoConEvents
 
 		public string GetPluginWebsite()
 		{
-			return "http://battlelog.battlefield.com/bf4/soldier/stajs/stats/904562646/pc/";
+			return "battlelog.battlefield.com/bf4/soldier/stajs/stats/904562646/pc/";
 		}
 
 		public string GetPluginDescription()
 		{
-			return "<h2>Pure awesomeness</h2>";
+			return GetDescriptionHtml();
 		}
 
 		public List<CPluginVariable> GetDisplayPluginVariables()
@@ -130,11 +130,11 @@ namespace PRoConEvents
 					if (!int.TryParse(value, out i))
 						return;
 
-					if (i < 20)
-						i = 20;
+					if (i < PunishWindowMin)
+						i = PunishWindowMin;
 
-					if (i > 120)
-						i = 120;
+					if (i > PunishWindowMax)
+						i = PunishWindowMax;
 
 					_punishWindow = TimeSpan.FromSeconds(i);
 
@@ -553,6 +553,82 @@ namespace PRoConEvents
 			message = ReplaceStaches(message);
 			ExecuteCommand("procon.protected.send", "admin.say", message, "player", player);
 			ExecuteCommand("procon.protected.chat.write", "(AdminSayPlayer " + player + ") " + message);
+		}
+
+		private string GetDescriptionHtml()
+		{
+			return @"
+
+<style type=""text/css"">
+	p { font-size: 1em; }
+	p.default-value { color: #666; }
+	table th { text-transform: none; }
+</style>
+
+<h2>Description</h2>
+<p>Track team kill stats and allow victims to punish team killers.</p>
+
+<h2>Plugin Settings</h2>
+
+<h3>" + VariableName.VictimAndKillerNotice + @"</h3>
+<p>The notice given to both the killer and the victim of a team kill.</p>
+
+<h4>Available substitutions</h4>
+<table>
+<tr>
+	<th>Placeholder</th>
+	<th>Description</th>
+</tr>
+<tr>
+	<td><strong>{killer}</strong></td>
+	<td>Player name of killer.</td>
+</tr>
+<tr>
+	<td><strong>{victim}</strong></td>
+	<td>Player name of victim.</td>
+</tr>
+<tr>
+	<td><strong>{killCount}</strong></td>
+	<td>Total team kill count for killer.</td>
+</tr>
+<tr>
+	<td><strong>{killCount:<em>&lt;singular&gt;</em>|<em>&lt;plural&gt;</em>}</strong></td>
+	<td>The units to use for the kill count. If kill count is one, the value of <em>&lt;singular&gt;</em> is used, otherwise <em>&lt;plural&gt;</em> is used.</td>
+</tr>
+</table>
+
+<h4>Default value</h4>
+<p class=""default-value"">{killer} TEAM KILLED {victim}. Watch your fire dum-dum! {killer} has TK'd a total of {killCount} {killCount:time|times}.</p>
+
+<h3>" + VariableName.ShowStatsOnVictimPrompt + @"</h3>
+<p>Show extra information when a victim is prompted to punish or forgive to help them decide. This includes:</p>
+<ul>
+	<li>The number of times the killer has killed the victim before.</li>
+	<li>The number of times the victim has punished or forgiven the killer.</li>
+	<li>The number of times the killer has been auto-forgiven for a team kill on this victim.</li>
+</ul>
+
+<h4>Default value</h4>
+<p class=""default-value"">Yes</p>
+
+<h3>" + VariableName.PunishWindow + @"</h3>
+<p>How long (in seconds) to allow a victim to punish or forgive before the killer is auto-forgiven.</p>
+
+<h4>Range</h4>
+<table>
+<tr>
+	<th>Minimum</th>
+	<td>" + PunishWindowMin + @"</td>
+</tr>
+<tr>
+	<th>Maximum</th>
+	<td>" + PunishWindowMax + @"</td>
+</tr>
+</table>
+
+<h4>Default value</h4>
+<p class=""default-value"">45</p>
+";
 		}
 	}
 }
