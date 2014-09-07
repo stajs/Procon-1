@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Security.Policy;
 using System.Text;
+using System.Text.RegularExpressions;
 using PRoCon.Core;
 using PRoCon.Core.Plugin;
 
@@ -11,7 +14,22 @@ namespace PRoConEvents
 	{
 		private static object _lock = new object();
 		private List<TeamKill> _teamKills = new List<TeamKill>();
-		private TimeSpan _punishWindowLength = TimeSpan.FromSeconds(45);
+		private TimeSpan _punishWindow = TimeSpan.FromSeconds(45);
+		private string _victimAndKillerNotice = "{killer} TEAMKILLED {victim}. Watch your fire dum-dum! {killer} has TK'd a total of {killCount} {killCount:time|times}.";
+		private enumBoolYesNo _showStatsOnVictimPrompt = enumBoolYesNo.Yes;
+
+		private struct VariableGroup
+		{
+			public const string Timing = "Timing|";
+			public const string Messages = "Messages|";
+		}
+
+		private struct VariableName
+		{
+			public const string PunishWindow = "Punish window (seconds)";
+			public const string VictimAndKillerNotice = "Victim and killer notice";
+			public const string ShowStatsOnVictimPrompt = "Show stats on victim prompt?";
+		}
 
 		private enum TeamKillStatus
 		{
@@ -85,7 +103,7 @@ namespace PRoConEvents
 
 		public string GetPluginDescription()
 		{
-			return "<h1>Pure awesomeness</h1>";
+			return "<h2>Pure awesomeness</h2>";
 		}
 
 		public List<CPluginVariable> GetDisplayPluginVariables()
@@ -95,12 +113,41 @@ namespace PRoConEvents
 
 		public List<CPluginVariable> GetPluginVariables()
 		{
-			return new List<CPluginVariable>();
+			return new List<CPluginVariable>
+			{
+				new CPluginVariable(VariableGroup.Timing + VariableName.PunishWindow, typeof(int), _punishWindow.TotalSeconds),
+				new CPluginVariable(VariableGroup.Messages + VariableName.VictimAndKillerNotice, typeof(string), _victimAndKillerNotice),
+				new CPluginVariable(VariableGroup.Messages + VariableName.ShowStatsOnVictimPrompt, typeof(enumBoolYesNo), _showStatsOnVictimPrompt)
+			};
 		}
 
-		public void SetPluginVariable(string strVariable, string strValue)
+		public void SetPluginVariable(string variable, string value)
 		{
+			switch (variable)
+			{
+				case VariableName.PunishWindow:
+					int i;
+					if (!int.TryParse(value, out i))
+						return;
 
+					if (i < 20)
+						i = 20;
+
+					if (i > 120)
+						i = 120;
+
+					_punishWindow = TimeSpan.FromSeconds(i);
+
+					break;
+
+				case VariableName.VictimAndKillerNotice:
+					_victimAndKillerNotice = value;
+					break;
+
+				case VariableName.ShowStatsOnVictimPrompt:
+					_showStatsOnVictimPrompt = value == "Yes" ? enumBoolYesNo.Yes : enumBoolYesNo.No;
+					break;
+			}
 		}
 
 		#endregion
@@ -166,6 +213,37 @@ namespace PRoConEvents
 			}
 		}
 
+		private string GetVictimAndKillerNotice(string killer, string victim, int killCount)
+		{
+			var ret = _victimAndKillerNotice
+				.Replace("{killer}", killer)
+				.Replace("{victim}", victim)
+				.Replace("{killCount}", killCount.ToString());
+
+			var regex = new Regex("{killCount:.*}");
+			var match = regex.Match(ret);
+
+			if (!match.Success)
+				return ReplaceStaches(ret);
+
+			var matchString = match.ToString();
+
+			var units = matchString
+				.Replace("{killCount:", string.Empty)
+				.Replace("}", string.Empty)
+				.Split(new[] { "|" }, StringSplitOptions.RemoveEmptyEntries);
+
+			if (units.Length == 0)
+				return ReplaceStaches(ret);
+
+			var killCountSingular = units.First();
+			var killCountPlural = units.Last();
+
+			ret = ret.Replace(matchString, killCount == 1 ? killCountSingular : killCountPlural);
+
+			return ReplaceStaches(ret);
+		}
+
 		private void OnTeamKill(Kill kill)
 		{
 			const string prefix = "OnTeamKill | ";
@@ -176,18 +254,16 @@ namespace PRoConEvents
 				return;
 			}
 
-			// TODO: Uncomment. This is commented out to test fake TKs with suicides.
-			//if (kill.IsSuicide)
-			//{
-			//    WriteConsole(message + "Was suicide.");
-			//    return;
-			//}
+			if (kill.IsSuicide)
+			{
+				WriteConsole(prefix + "Was suicide.");
+				return;
+			}
 
 			var victimName = kill.Victim.SoldierName;
 			var killerName = kill.Killer.SoldierName;
 
-			// TODO: Remove safety check.
-			if (string.IsNullOrEmpty(victimName) || string.IsNullOrEmpty(killerName) || victimName != "stajs")
+			if (string.IsNullOrEmpty(victimName) || string.IsNullOrEmpty(killerName))
 			{
 				WriteConsole(prefix + "Can not determine name.");
 				return;
@@ -201,7 +277,8 @@ namespace PRoConEvents
 				return;
 			}
 
-			// Auto-forgive any previous pending TKs for this killer and victim.
+			// Auto-forgive any previous pending TKs for this killer and victim - there should only be one pending
+			// at a time for this combination, and it's about to be added.
 			AutoForgive(killerName, victimName);
 
 			lock (_lock)
@@ -219,45 +296,42 @@ namespace PRoConEvents
 				.Where(tk => tk.KillerName == killerName)
 				.ToList();
 
-			var message = string.Format("{0} TEAMKILLED {1}. Watch your fire dum-dum! {0} has TK'd a total of {2} time{3}.",
-				killerName,
-				victimName,
-				allKillsByKiller.Count,
-				allKillsByKiller.Count == 1 ? string.Empty : "s"
-				);
+			var message = GetVictimAndKillerNotice(killerName, victimName, allKillsByKiller.Count);
 
 			AdminSayPlayer(killerName, message);
 			AdminSayPlayer(victimName, message);
 
-			var victimKillsByKiller = allKillsByKiller
-				.Where(tk => tk.VictimName == victimName)
-				.ToList();
+			var sb = new StringBuilder(victimName + ": !p to punish, !f to forgive.");
 
-			var punishedCount = victimKillsByKiller.Count(tk => tk.Status == TeamKillStatus.Punished);
-			var forgivenCount = victimKillsByKiller.Count(tk => tk.Status == TeamKillStatus.Forgiven);
-			var autoForgivenCount = victimKillsByKiller.Count(tk => tk.Status == TeamKillStatus.AutoForgiven);
-
-			//TODO: remove extra !. Currently there to avoid conflicting with PRoconRulz.
-			var sb = new StringBuilder(victimName + ": !!p to punish, !!f to forgive.");
-
-			if (victimKillsByKiller.Count == 0)
+			if (_showStatsOnVictimPrompt == enumBoolYesNo.Yes)
 			{
-				sb.AppendFormat(" This is the first time {0} has TK'd you.", killerName);
-			}
-			else
-			{
-				sb.AppendFormat(" Previous stats - TK's by {0} on you: {1}", killerName, victimKillsByKiller.Count);
+				var victimKillsByKiller = allKillsByKiller
+					.Where(tk => tk.VictimName == victimName)
+					.ToList();
 
-				if (punishedCount > 0)
-					sb.AppendFormat(", punished: {0}", punishedCount);
+				var punishedCount = victimKillsByKiller.Count(tk => tk.Status == TeamKillStatus.Punished);
+				var forgivenCount = victimKillsByKiller.Count(tk => tk.Status == TeamKillStatus.Forgiven);
+				var autoForgivenCount = victimKillsByKiller.Count(tk => tk.Status == TeamKillStatus.AutoForgiven);
 
-				if (forgivenCount > 0)
-					sb.AppendFormat(", forgiven: {0}", forgivenCount);
+				if (victimKillsByKiller.Count == 0)
+				{
+					sb.AppendFormat(" This is the first time {0} has TK'd you.", killerName);
+				}
+				else
+				{
+					sb.AppendFormat(" Previous stats - TK's by {0} on you: {1}", killerName, victimKillsByKiller.Count);
 
-				if (autoForgivenCount > 0)
-					sb.AppendFormat(", auto-forgiven: {0}", autoForgivenCount);
+					if (punishedCount > 0)
+						sb.AppendFormat(", punished: {0}", punishedCount);
 
-				sb.Append(".");
+					if (forgivenCount > 0)
+						sb.AppendFormat(", forgiven: {0}", forgivenCount);
+
+					if (autoForgivenCount > 0)
+						sb.AppendFormat(", auto-forgiven: {0}", autoForgivenCount);
+
+					sb.Append(".");
+				}
 			}
 
 			AdminSayPlayer(victimName, sb.ToString());
@@ -265,26 +339,23 @@ namespace PRoConEvents
 
 		private void OnChat(string speaker, string message)
 		{
-			// TODO: remove safety check.    
-			if (speaker != "stajs")
-				return;
-
-			if (message == "!!shame")
+			if (message == "!shame")
 				Shame();
 
-			if (message.StartsWith("!!add"))
+			// TODO: Remove.
+			if (speaker == "stajs" && message.StartsWith("!add"))
 				Add(message);
 
-			if (message == ("!!p"))
+			if (message == ("!p"))
 				PunishKillerOf(speaker);
 
-			if (message == ("!!f"))
+			if (message == ("!f"))
 				ForgiveKillerOf(speaker);
 		}
 
 		private void AutoForgivePastPunishWindow()
 		{
-			var punishWindowStart = DateTime.UtcNow.Add(_punishWindowLength.Negate());
+			var punishWindowStart = DateTime.UtcNow.Add(_punishWindow.Negate());
 
 			lock (_lock)
 			{
@@ -309,7 +380,7 @@ namespace PRoConEvents
 			var kills = GetPendingTeamKillsForVictim(victim);
 
 			if (!kills.Any())
-				AdminSayPlayer(victim, "Could not find player to punish.");
+				AdminSayPlayer(victim, string.Format("No one to punish (auto-forgive after {0} seconds).", _punishWindow.TotalSeconds));
 
 			if (kills.Count > 1)
 				WriteConsole("Players found to punish: " + kills.Count);
@@ -325,7 +396,7 @@ namespace PRoConEvents
 			var kills = GetPendingTeamKillsForVictim(victim);
 
 			if (!kills.Any())
-				AdminSayPlayer(victim, "Could not find player to forgive.");
+				AdminSayPlayer(victim, string.Format("No one to forgive (auto-forgive after {0} seconds).", _punishWindow.TotalSeconds));
 
 			if (kills.Count > 1)
 				WriteConsole("Players found to forgive: " + kills.Count);
@@ -417,7 +488,7 @@ namespace PRoConEvents
 			AdminSayAll("Worst team killers: " + sb);
 		}
 
-		// TODO: Remove. Only for testing.
+		// TODO: Remove.
 		private void Add(string message)
 		{
 			var parts = message.Split(new[] { " " }, StringSplitOptions.RemoveEmptyEntries);
