@@ -13,8 +13,8 @@ namespace PRoConEvents
 		private struct VariableGroup
 		{
 			public const string Commands = "Commands|";
-			public const string Timing = "Timing|";
 			public const string Messages = "Messages|";
+			public const string Limits = "Limits|";
 		}
 
 		private struct VariableName
@@ -29,6 +29,8 @@ namespace PRoConEvents
 			public const string PunishedMessage = "Punished";
 			public const string ForgivenMessage = "Forgiven";
 			public const string PunishWindow = "Punish window (seconds)";
+			public const string HasPunishLimit = "Kick after punish limit reached?";
+			public const string PunishLimit = "Punish limit";
 		}
 
 		private static readonly Dictionary<string, object> Defaults = new Dictionary<string, object>
@@ -42,11 +44,15 @@ namespace PRoConEvents
 			{ VariableName.NoOneToForgiveMessage, "No one to forgive (auto-forgive after {window} seconds)."},
 			{ VariableName.PunishedMessage, "Punished {killer}."},
 			{ VariableName.ForgivenMessage, "Forgiven {killer}."},
-			{ VariableName.PunishWindow, TimeSpan.FromSeconds(45)}
+			{ VariableName.PunishWindow, TimeSpan.FromSeconds(45)},
+			{ VariableName.HasPunishLimit, enumBoolYesNo.Yes},
+			{ VariableName.PunishLimit, 5},
 		};
 
 		private const int PunishWindowMin = 20;
 		private const int PunishWindowMax = 120;
+		private const int PunishLimitMin = 1;
+		private const int PunishLimitMax = 20;
 
 		private string _punishCommand = Defaults[VariableName.PunishCommand].ToString();
 		private string _forgiveCommand = Defaults[VariableName.ForgiveCommand].ToString();
@@ -58,6 +64,8 @@ namespace PRoConEvents
 		private string _punishedMessage = Defaults[VariableName.PunishedMessage].ToString();
 		private string _forgivenMessage = Defaults[VariableName.ForgivenMessage].ToString();
 		private TimeSpan _punishWindow = (TimeSpan)Defaults[VariableName.PunishWindow];
+		private enumBoolYesNo _hasPunishLimit = (enumBoolYesNo)Defaults[VariableName.HasPunishLimit];
+		private int _punishLimit = (int)Defaults[VariableName.PunishLimit];
 
 		private List<TeamKill> _teamKills = new List<TeamKill>();
 
@@ -539,29 +547,18 @@ namespace PRoConEvents
 				new CPluginVariable(VariableGroup.Messages + VariableName.ForgivenMessage, typeof(string), _forgivenMessage),
 				new CPluginVariable(VariableGroup.Messages + VariableName.NoOneToPunishMessage, typeof(string), _noOneToPunishMessage),
 				new CPluginVariable(VariableGroup.Messages + VariableName.NoOneToForgiveMessage, typeof(string), _noOneToForgiveMessage),
-				new CPluginVariable(VariableGroup.Timing + VariableName.PunishWindow, typeof(int), _punishWindow.TotalSeconds)
+				new CPluginVariable(VariableGroup.Limits + VariableName.PunishWindow, typeof(int), _punishWindow.TotalSeconds),
+				new CPluginVariable(VariableGroup.Limits + VariableName.HasPunishLimit, typeof(enumBoolYesNo), _hasPunishLimit),
+				new CPluginVariable(VariableGroup.Limits + VariableName.PunishLimit, typeof(int), _punishLimit)
 			};
 		}
 
 		private void SaveSetting(string setting, string value)
 		{
+			int i;
+
 			switch (setting)
 			{
-				case VariableName.PunishWindow:
-					int i;
-					if (!int.TryParse(value, out i))
-						return;
-
-					if (i < PunishWindowMin)
-						i = PunishWindowMin;
-
-					if (i > PunishWindowMax)
-						i = PunishWindowMax;
-
-					_punishWindow = TimeSpan.FromSeconds(i);
-
-					break;
-
 				case VariableName.TeamKillMessage:
 					_teamKillMessage = value;
 					break;
@@ -596,6 +593,40 @@ namespace PRoConEvents
 
 				case VariableName.ForgivenMessage:
 					_forgivenMessage = value;
+					break;
+
+				case VariableName.PunishWindow:
+
+					if (!int.TryParse(value, out i))
+						return;
+
+					if (i < PunishWindowMin)
+						i = PunishWindowMin;
+
+					if (i > PunishWindowMax)
+						i = PunishWindowMax;
+
+					_punishWindow = TimeSpan.FromSeconds(i);
+
+					break;
+
+				case VariableName.HasPunishLimit:
+					_hasPunishLimit = value == "Yes" ? enumBoolYesNo.Yes : enumBoolYesNo.No;
+					break;
+
+				case VariableName.PunishLimit:
+
+					if (!int.TryParse(value, out i))
+						return;
+
+					if (i < PunishLimitMin)
+						i = PunishLimitMin;
+
+					if (i > PunishLimitMax)
+						i = PunishLimitMax;
+
+					_punishLimit = i;
+
 					break;
 			}
 		}
@@ -754,7 +785,7 @@ namespace PRoConEvents
 <h4>Default value</h4>
 <p class=""default-value"">" + Defaults[VariableName.NoOneToForgiveMessage] + @"</p>
 
-<h2 class=""group"">Timing</h2>
+<h2 class=""group"">Limits</h2>
 
 <h3>" + VariableName.PunishWindow + @"</h3>
 <p>How long (in seconds) to allow a victim to punish or forgive before the killer is auto-forgiven.</p>
@@ -773,6 +804,30 @@ namespace PRoConEvents
 
 <h4>Default value</h4>
 <p class=""default-value"">" + ((TimeSpan)Defaults[VariableName.PunishWindow]).TotalSeconds + @"</p>
+
+<h3>" + VariableName.HasPunishLimit + @"</h3>
+<p>Should a team killer be kicked after reaching the <em>punish limit</em>?</p>
+
+<h4>Default value</h4>
+<p class=""default-value"">" + Defaults[VariableName.HasPunishLimit] + @"</p>
+
+<h3>" + VariableName.PunishLimit + @"</h3>
+<p>How many times a killer is allowed to be punished before being kicked. If the setting is blank, no limit is applied.</p>
+
+<h4>Range</h4>
+<table>
+<tr>
+	<th>Minimum</th>
+	<td>" + PunishLimitMin + @"</td>
+</tr>
+<tr>
+	<th>Maximum</th>
+	<td>" + PunishLimitMax + @"</td>
+</tr>
+</table>
+
+<h4>Default value</h4>
+<p class=""default-value"">" + Defaults[VariableName.PunishLimit] + @"</p>
 ";
 		}
 	}
