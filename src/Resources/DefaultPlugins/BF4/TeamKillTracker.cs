@@ -10,7 +10,6 @@ namespace PRoConEvents
 {
 	public class TeamKillTracker : PRoConPluginAPI, IPRoConPluginInterface
 	{
-		private static object _lock = new object();
 		private List<TeamKill> _teamKills = new List<TeamKill>();
 		private const int PunishWindowMin = 20;
 		private const int PunishWindowMax = 120;
@@ -68,11 +67,7 @@ namespace PRoConEvents
 
 		public void OnPluginEnable()
 		{
-			lock (_lock)
-			{
-				_teamKills = new List<TeamKill>();
-			}
-
+			_teamKills = new List<TeamKill>();
 			WriteConsole("^2Enabled.^0");
 		}
 
@@ -188,11 +183,7 @@ namespace PRoConEvents
 		public override void OnRoundOver(int winningTeamId)
 		{
 			Shame();
-
-			lock (_lock)
-			{
-				_teamKills = new List<TeamKill>();
-			}
+			_teamKills = new List<TeamKill>();
 		}
 
 		public override void OnPlayerKilled(Kill kill)
@@ -204,13 +195,10 @@ namespace PRoConEvents
 
 		private void AutoForgive(string killer, string victim)
 		{
-			lock (_lock)
-			{
-				_teamKills
-					.Where(tk => tk.KillerName == killer && tk.VictimName == victim && tk.Status == TeamKillStatus.Pending)
-					.ToList()
-					.ForEach(tk => tk.Status = TeamKillStatus.AutoForgiven);
-			}
+			_teamKills
+				.Where(tk => tk.KillerName == killer && tk.VictimName == victim && tk.Status == TeamKillStatus.Pending)
+				.ToList()
+				.ForEach(tk => tk.Status = TeamKillStatus.AutoForgiven);
 		}
 
 		private string GetVictimAndKillerNotice(string killer, string victim, int killCount)
@@ -269,16 +257,13 @@ namespace PRoConEvents
 			// at a time for this combination, and it's about to be added.
 			AutoForgive(killerName, victimName);
 
-			lock (_lock)
+			_teamKills.Add(new TeamKill
 			{
-				_teamKills.Add(new TeamKill
-				{
-					KillerName = killerName,
-					VictimName = victimName,
-					At = DateTime.UtcNow,
-					Status = TeamKillStatus.Pending
-				});
-			}
+				KillerName = killerName,
+				VictimName = victimName,
+				At = DateTime.UtcNow,
+				Status = TeamKillStatus.Pending
+			});
 
 			var allKillsByKiller = _teamKills
 				.Where(tk => tk.KillerName == killerName)
@@ -345,13 +330,10 @@ namespace PRoConEvents
 		{
 			var punishWindowStart = DateTime.UtcNow.Add(_punishWindow.Negate());
 
-			lock (_lock)
-			{
-				_teamKills
-					.Where(tk => tk.Status == TeamKillStatus.Pending && tk.At < punishWindowStart)
-					.ToList()
-					.ForEach(tk => tk.Status = TeamKillStatus.AutoForgiven);
-			}
+			_teamKills
+				.Where(tk => tk.Status == TeamKillStatus.Pending && tk.At < punishWindowStart)
+				.ToList()
+				.ForEach(tk => tk.Status = TeamKillStatus.AutoForgiven);
 		}
 
 		private List<TeamKill> GetPendingTeamKillsForVictim(string victim)
@@ -417,10 +399,7 @@ namespace PRoConEvents
 			AdminSayPlayer(kill.KillerName, message);
 			AdminSayPlayer(kill.VictimName, message);
 
-			lock (_lock)
-			{
-				kill.Status = TeamKillStatus.Punished;
-			}
+			kill.Status = TeamKillStatus.Punished;
 
 			if (IsAdmin(kill.KillerName))
 				AdminSayPlayer(kill.KillerName, "Protected from kill.");
@@ -435,10 +414,7 @@ namespace PRoConEvents
 			AdminSayPlayer(kill.KillerName, message);
 			AdminSayPlayer(kill.VictimName, message);
 
-			lock (_lock)
-			{
-				kill.Status = TeamKillStatus.Forgiven;
-			}
+			kill.Status = TeamKillStatus.Forgiven;
 		}
 
 		private void Shame()
@@ -506,16 +482,13 @@ namespace PRoConEvents
 					break;
 			}
 
-			lock (_lock)
+			_teamKills.Add(new TeamKill
 			{
-				_teamKills.Add(new TeamKill
-				{
-					KillerName = name,
-					VictimName = "stajs",
-					At = DateTime.UtcNow,
-					Status = status
-				});
-			}
+				KillerName = name,
+				VictimName = "stajs",
+				At = DateTime.UtcNow,
+				Status = status
+			});
 		}
 
 		private string ReplaceStaches(string s)
