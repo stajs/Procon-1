@@ -528,10 +528,10 @@ namespace PRoConEvents
 				new CPluginVariable(VariableGroup.Messages + VariableName.TeamKillMessage, typeof(string), _teamKillMessage),
 				new CPluginVariable(VariableGroup.Messages + VariableName.VictimPromptMessage, typeof(string), _victimPromptMessage),
 				new CPluginVariable(VariableGroup.Messages + VariableName.ShowStatsOnVictimPromptMessage, typeof(enumBoolYesNo), _showStatsOnVictimPromptMessage),
-				new CPluginVariable(VariableGroup.Messages + VariableName.NoOneToPunishMessage, typeof(string), _noOneToPunishMessage),
-				new CPluginVariable(VariableGroup.Messages + VariableName.NoOneToForgiveMessage, typeof(string), _noOneToForgiveMessage),
 				new CPluginVariable(VariableGroup.Messages + VariableName.PunishedMessage, typeof(string), _punishedMessage),
 				new CPluginVariable(VariableGroup.Messages + VariableName.ForgivenMessage, typeof(string), _forgivenMessage),
+				new CPluginVariable(VariableGroup.Messages + VariableName.NoOneToPunishMessage, typeof(string), _noOneToPunishMessage),
+				new CPluginVariable(VariableGroup.Messages + VariableName.NoOneToForgiveMessage, typeof(string), _noOneToForgiveMessage),
 				new CPluginVariable(VariableGroup.Timing + VariableName.PunishWindow, typeof(int), _punishWindow.TotalSeconds)
 			};
 		}
@@ -599,10 +599,12 @@ namespace PRoConEvents
 
 <style type=""text/css"">
 	p { font-size: 1em; }
-	p.default-value { color: #666; }
+	p.default-value { color: #5e5e5e; }
 	table th { text-transform: none; }
-	h2.group { color: #666; font-size: 1.6em; margin: 1.5em 0 1em 0; padding-bottom: 0.3em; border-bottom: 1px solid #dcdcdb; }
-	h3 { font-size: 1.3em; }
+	h2 { margin-top: 1.1em; }
+	h2.group { color: #111; font-size: 1.6em; margin-top: 1.6em; margin-bottom: 0; }
+	h3 { font-size: 1.4em; font-family: Vera, Helvetica, Georgia; margin-top: 1.6em; font-weight: 400; padding-bottom: 6px; border-bottom: 1px solid #dcdcdb; }
+	h4 { color: #555; font-size: 1em; margin-top: 0; }
 </style>
 
 <h2>Description</h2>
@@ -627,7 +629,7 @@ namespace PRoConEvents
 <h2 class=""group"">Messages</h2>
 
 <h3>" + VariableName.TeamKillMessage + @"</h3>
-<p>The notice given to both the killer and the victim of a team kill.</p>
+<p>Sent to both the killer and victim when a team kill is detected.</p>
 
 <h4>Available substitutions</h4>
 <table>
@@ -656,10 +658,16 @@ namespace PRoConEvents
 <h4>Default value</h4>
 <p class=""default-value"">" + Defaults[VariableName.TeamKillMessage] + @"</p>
 
+<h3>" + VariableName.VictimPromptMessage + @"</h3>
+<p>Sent to the victim when a team kill is detected.</p>
+
+<h4>Default value</h4>
+<p class=""default-value"">" + Defaults[VariableName.VictimPromptMessage] + @"</p>
+
 <h3>" + VariableName.ShowStatsOnVictimPromptMessage + @"</h3>
-<p>Show extra information when a victim is prompted to punish or forgive to help them decide. This includes:</p>
+<p>Show statistics with the victim prompt. This includes:</p>
 <ul>
-	<li>The number of times the killer has killed the victim before.</li>
+	<li>The number of times the killer has killed the victim.</li>
 	<li>The number of times the victim has punished or forgiven the killer.</li>
 	<li>The number of times the killer has been auto-forgiven for a team kill on this victim.</li>
 </ul>
@@ -667,44 +675,8 @@ namespace PRoConEvents
 <h4>Default value</h4>
 <p class=""default-value"">" + Defaults[VariableName.ShowStatsOnVictimPromptMessage] + @"</p>
 
-<h3>" + VariableName.NoOneToPunishMessage + @"</h3>
-<p>Message to display when a <em>punish</em> command is unsuccessful.</p>
-
-<h4>Available substitutions</h4>
-<table>
-<tr>
-	<th>Placeholder</th>
-	<th>Description</th>
-</tr>
-<tr>
-	<td><strong>{window}</strong></td>
-	<td>Length (in seconds) of the punish window.</td>
-</tr>
-</table>
-
-<h4>Default value</h4>
-<p class=""default-value"">" + Defaults[VariableName.NoOneToPunishMessage] + @"</p>
-
-<h3>" + VariableName.NoOneToForgiveMessage + @"</h3>
-<p>Message to display when a <em>forgive</em> command is unsuccessful.</p>
-
-<h4>Available substitutions</h4>
-<table>
-<tr>
-	<th>Placeholder</th>
-	<th>Description</th>
-</tr>
-<tr>
-	<td><strong>{window}</strong></td>
-	<td>Length (in seconds) of the punish window.</td>
-</tr>
-</table>
-
-<h4>Default value</h4>
-<p class=""default-value"">" + Defaults[VariableName.NoOneToForgiveMessage] + @"</p>
-
 <h3>" + VariableName.PunishedMessage + @"</h3>
-<p>Message to display when a <em>punish</em> command is successful.</p>
+<p>Sent to both the killer and victim when a <em>punish</em> command is successful.</p>
 
 <h4>Available substitutions</h4>
 <table>
@@ -722,7 +694,7 @@ namespace PRoConEvents
 <p class=""default-value"">" + Defaults[VariableName.PunishedMessage] + @"</p>
 
 <h3>" + VariableName.ForgivenMessage + @"</h3>
-<p>Message to display when a <em>forgive</em> command is successful.</p>
+<p>Sent to both the killer and victim when a <em>forgive</em> command is successful.</p>
 
 <h4>Available substitutions</h4>
 <table>
@@ -738,6 +710,42 @@ namespace PRoConEvents
 
 <h4>Default value</h4>
 <p class=""default-value"">" + Defaults[VariableName.ForgivenMessage] + @"</p>
+
+<h3>" + VariableName.NoOneToPunishMessage + @"</h3>
+<p>Sent to both the killer and victim when a <em>punish</em> command is unsuccessful.</p>
+
+<h4>Available substitutions</h4>
+<table>
+<tr>
+	<th>Placeholder</th>
+	<th>Description</th>
+</tr>
+<tr>
+	<td><strong>{window}</strong></td>
+	<td>Length (in seconds) of the punish window.</td>
+</tr>
+</table>
+
+<h4>Default value</h4>
+<p class=""default-value"">" + Defaults[VariableName.NoOneToPunishMessage] + @"</p>
+
+<h3>" + VariableName.NoOneToForgiveMessage + @"</h3>
+<p>Sent to both the killer and victim when a <em>forgive</em> command is unsuccessful.</p>
+
+<h4>Available substitutions</h4>
+<table>
+<tr>
+	<th>Placeholder</th>
+	<th>Description</th>
+</tr>
+<tr>
+	<td><strong>{window}</strong></td>
+	<td>Length (in seconds) of the punish window.</td>
+</tr>
+</table>
+
+<h4>Default value</h4>
+<p class=""default-value"">" + Defaults[VariableName.NoOneToForgiveMessage] + @"</p>
 
 <h2 class=""group"">Timing</h2>
 
