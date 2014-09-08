@@ -10,23 +10,32 @@ namespace PRoConEvents
 {
 	public class TeamKillTracker : PRoConPluginAPI, IPRoConPluginInterface
 	{
-		private List<TeamKill> _teamKills = new List<TeamKill>();
 		private const int PunishWindowMin = 20;
 		private const int PunishWindowMax = 120;
+
+		private List<TeamKill> _teamKills = new List<TeamKill>();
+
 		private TimeSpan _punishWindow = TimeSpan.FromSeconds(45);
+		private string _punishCommand = "!p";
+		private string _forgiveCommand = "!f";
+		private string _victimPrompt = "!p to punish, !f to forgive.";
 		private string _victimAndKillerNotice = "{killer} TEAM KILLED {victim}. Watch your fire dum-dum! {killer} has TK'd a total of {killCount} {killCount:time|times}.";
 		private enumBoolYesNo _showStatsOnVictimPrompt = enumBoolYesNo.Yes;
 
 		private struct VariableGroup
 		{
+			public const string Commands = "Commands|";
 			public const string Timing = "Timing|";
 			public const string Messages = "Messages|";
 		}
 
 		private struct VariableName
 		{
+			public const string PunishCommand = "Punish";
+			public const string ForgiveCommand = "Forgive";
 			public const string PunishWindow = "Punish window (seconds)";
 			public const string VictimAndKillerNotice = "Victim and killer notice";
+			public const string VictimPrompt = "Victim prompt";
 			public const string ShowStatsOnVictimPrompt = "Show stats on victim prompt?";
 		}
 
@@ -103,46 +112,17 @@ namespace PRoConEvents
 
 		public List<CPluginVariable> GetDisplayPluginVariables()
 		{
-			return GetPluginVariables();
+			return GetSettings();
 		}
 
 		public List<CPluginVariable> GetPluginVariables()
 		{
-			return new List<CPluginVariable>
-			{
-				new CPluginVariable(VariableGroup.Timing + VariableName.PunishWindow, typeof(int), _punishWindow.TotalSeconds),
-				new CPluginVariable(VariableGroup.Messages + VariableName.VictimAndKillerNotice, typeof(string), _victimAndKillerNotice),
-				new CPluginVariable(VariableGroup.Messages + VariableName.ShowStatsOnVictimPrompt, typeof(enumBoolYesNo), _showStatsOnVictimPrompt)
-			};
+			return GetSettings();
 		}
 
 		public void SetPluginVariable(string variable, string value)
 		{
-			switch (variable)
-			{
-				case VariableName.PunishWindow:
-					int i;
-					if (!int.TryParse(value, out i))
-						return;
-
-					if (i < PunishWindowMin)
-						i = PunishWindowMin;
-
-					if (i > PunishWindowMax)
-						i = PunishWindowMax;
-
-					_punishWindow = TimeSpan.FromSeconds(i);
-
-					break;
-
-				case VariableName.VictimAndKillerNotice:
-					_victimAndKillerNotice = value;
-					break;
-
-				case VariableName.ShowStatsOnVictimPrompt:
-					_showStatsOnVictimPrompt = value == "Yes" ? enumBoolYesNo.Yes : enumBoolYesNo.No;
-					break;
-			}
+			SaveSetting(variable, value);
 		}
 
 		#endregion
@@ -274,7 +254,9 @@ namespace PRoConEvents
 			AdminSayPlayer(killerName, message);
 			AdminSayPlayer(victimName, message);
 
-			var sb = new StringBuilder(victimName + ": !p to punish, !f to forgive.");
+			var sb = new StringBuilder(victimName)
+				.Append(": ")
+				.Append(_victimPrompt);
 
 			if (_showStatsOnVictimPrompt == enumBoolYesNo.Yes)
 			{
@@ -319,10 +301,10 @@ namespace PRoConEvents
 			if (speaker == "stajs" && message.StartsWith("!add"))
 				Add(message);
 
-			if (message == ("!p"))
+			if (message == (_punishCommand))
 				PunishKillerOf(speaker);
 
-			if (message == ("!f"))
+			if (message == (_forgiveCommand))
 				ForgiveKillerOf(speaker);
 		}
 
@@ -516,6 +498,60 @@ namespace PRoConEvents
 			ExecuteCommand("procon.protected.chat.write", "(AdminSayPlayer " + player + ") " + message);
 		}
 
+		private List<CPluginVariable> GetSettings()
+		{
+			return new List<CPluginVariable>
+			{
+				new CPluginVariable(VariableGroup.Commands + VariableName.ForgiveCommand, typeof(string), _forgiveCommand),
+				new CPluginVariable(VariableGroup.Commands + VariableName.PunishCommand, typeof(string), _punishCommand),
+				new CPluginVariable(VariableGroup.Messages + VariableName.VictimAndKillerNotice, typeof(string), _victimAndKillerNotice),
+				new CPluginVariable(VariableGroup.Messages + VariableName.VictimPrompt, typeof(string), _victimPrompt),
+				new CPluginVariable(VariableGroup.Messages + VariableName.ShowStatsOnVictimPrompt, typeof(enumBoolYesNo), _showStatsOnVictimPrompt),
+				new CPluginVariable(VariableGroup.Timing + VariableName.PunishWindow, typeof(int), _punishWindow.TotalSeconds)
+			};
+		}
+
+		private void SaveSetting(string setting, string value)
+		{
+			switch (setting)
+			{
+				case VariableName.PunishWindow:
+					int i;
+					if (!int.TryParse(value, out i))
+						return;
+
+					if (i < PunishWindowMin)
+						i = PunishWindowMin;
+
+					if (i > PunishWindowMax)
+						i = PunishWindowMax;
+
+					_punishWindow = TimeSpan.FromSeconds(i);
+
+					break;
+
+				case VariableName.VictimAndKillerNotice:
+					_victimAndKillerNotice = value;
+					break;
+
+				case VariableName.ShowStatsOnVictimPrompt:
+					_showStatsOnVictimPrompt = value == "Yes" ? enumBoolYesNo.Yes : enumBoolYesNo.No;
+					break;
+
+				case VariableName.PunishCommand:
+					_punishCommand = value;
+					break;
+
+				case VariableName.ForgiveCommand:
+					_forgiveCommand = value;
+					break;
+
+				case VariableName.VictimPrompt:
+					_victimPrompt = value;
+					break;
+			}
+		}
+
 		private string GetDescriptionHtml()
 		{
 			return @"
@@ -524,12 +560,30 @@ namespace PRoConEvents
 	p { font-size: 1em; }
 	p.default-value { color: #666; }
 	table th { text-transform: none; }
+	h2.group { color: #666; font-size: 1.4em; margin: 1em 0; padding-bottom: 0.3em; border-bottom: 1px solid #dcdcdb; }
+	h3 { font-size: 1.3em; }
 </style>
 
 <h2>Description</h2>
 <p>Track team kill stats and allow victims to punish team killers.</p>
 
 <h2>Plugin Settings</h2>
+
+<h2 class=""group"">Commands</h2>
+
+<h3>" + VariableName.PunishCommand + @"</h3>
+<p>The command to punish a team killer. This can be issued in global, team, or squad chat.</p>
+
+<h4>Default value</h4>
+<p class=""default-value"">!p</p>
+
+<h3>" + VariableName.ForgiveCommand + @"</h3>
+<p>The command to forgive a team killer. This can be issued in global, team, or squad chat.</p>
+
+<h4>Default value</h4>
+<p class=""default-value"">!f</p>
+
+<h2 class=""group"">Messages</h2>
 
 <h3>" + VariableName.VictimAndKillerNotice + @"</h3>
 <p>The notice given to both the killer and the victim of a team kill.</p>
@@ -571,6 +625,8 @@ namespace PRoConEvents
 
 <h4>Default value</h4>
 <p class=""default-value"">Yes</p>
+
+<h2 class=""group"">Timing</h2>
 
 <h3>" + VariableName.PunishWindow + @"</h3>
 <p>How long (in seconds) to allow a victim to punish or forgive before the killer is auto-forgiven.</p>
