@@ -10,22 +10,6 @@ namespace PRoConEvents
 {
 	public class TeamKillTracker : PRoConPluginAPI, IPRoConPluginInterface
 	{
-		private const int PunishWindowMin = 20;
-		private const int PunishWindowMax = 120;
-
-		private List<TeamKill> _teamKills = new List<TeamKill>();
-
-		private TimeSpan _punishWindow = TimeSpan.FromSeconds(45);
-		private string _punishCommand = "!p";
-		private string _forgiveCommand = "!f";
-		private string _teamKillMessage = "{killer} TEAM KILLED {victim}. Watch your fire dum-dum! {killer} has TK'd a total of {killCount} {killCount:time|times}.";
-		private string _victimPromptMessage = "!p to punish, !f to forgive.";
-		private enumBoolYesNo _showStatsOnVictimPromptMessage = enumBoolYesNo.Yes;
-		private string _noOneToPunishMessage = "No one to punish (auto-forgive after {window} seconds).";
-		private string _noOneToForgiveMessage = "No one to forgive (auto-forgive after {window} seconds).";
-		private string _punishedMessage = "Punished {killer}.";
-		private string _forgivenMessage = "Forgiven {killer}.";
-
 		private struct VariableGroup
 		{
 			public const string Commands = "Commands|";
@@ -37,15 +21,45 @@ namespace PRoConEvents
 		{
 			public const string PunishCommand = "Punish";
 			public const string ForgiveCommand = "Forgive";
-			public const string PunishWindow = "Punish window (seconds)";
 			public const string TeamKillMessage = "Team kill";
 			public const string VictimPromptMessage = "Victim prompt";
+			public const string ShowStatsOnVictimPromptMessage = "Show stats on victim prompt?";
 			public const string NoOneToPunishMessage = "No one to punish";
 			public const string NoOneToForgiveMessage = "No one to forgive";
 			public const string PunishedMessage = "Punished";
 			public const string ForgivenMessage = "Forgiven";
-			public const string ShowStatsOnVictimPromptMessage = "Show stats on victim prompt?";
+			public const string PunishWindow = "Punish window (seconds)";
 		}
+
+		private static readonly Dictionary<string, object> Defaults = new Dictionary<string, object>
+		{
+			{ VariableName.PunishCommand, "!p"},
+			{ VariableName.ForgiveCommand, "!f"},
+			{ VariableName.TeamKillMessage, "{killer} TEAM KILLED {victim}. Watch your fire dum-dum! {killer} has TK'd a total of {killCount} {killCount:time|times}."},
+			{ VariableName.VictimPromptMessage, "!p to punish, !f to forgive."},
+			{ VariableName.ShowStatsOnVictimPromptMessage, enumBoolYesNo.Yes},
+			{ VariableName.NoOneToPunishMessage, "No one to punish (auto-forgive after {window} seconds)."},
+			{ VariableName.NoOneToForgiveMessage, "No one to forgive (auto-forgive after {window} seconds)."},
+			{ VariableName.PunishedMessage, "Punished {killer}."},
+			{ VariableName.ForgivenMessage, "Forgiven {killer}."},
+			{ VariableName.PunishWindow, TimeSpan.FromSeconds(45)}
+		};
+
+		private const int PunishWindowMin = 20;
+		private const int PunishWindowMax = 120;
+		
+		private string _punishCommand = Defaults[VariableName.PunishCommand].ToString();
+		private string _forgiveCommand = Defaults[VariableName.ForgiveCommand].ToString();
+		private string _teamKillMessage = Defaults[VariableName.TeamKillMessage].ToString();
+		private string _victimPromptMessage = Defaults[VariableName.VictimPromptMessage].ToString();
+		private enumBoolYesNo _showStatsOnVictimPromptMessage = (enumBoolYesNo) Defaults[VariableName.ShowStatsOnVictimPromptMessage];
+		private string _noOneToPunishMessage = Defaults[VariableName.NoOneToPunishMessage].ToString();
+		private string _noOneToForgiveMessage = Defaults[VariableName.NoOneToForgiveMessage].ToString();
+		private string _punishedMessage = Defaults[VariableName.PunishedMessage].ToString();
+		private string _forgivenMessage = Defaults[VariableName.ForgivenMessage].ToString();
+		private TimeSpan _punishWindow = (TimeSpan)Defaults[VariableName.PunishWindow];
+
+		private List<TeamKill> _teamKills = new List<TeamKill>();
 
 		private enum TeamKillStatus
 		{
@@ -509,8 +523,8 @@ namespace PRoConEvents
 		{
 			return new List<CPluginVariable>
 			{
-				new CPluginVariable(VariableGroup.Commands + VariableName.ForgiveCommand, typeof(string), _forgiveCommand),
 				new CPluginVariable(VariableGroup.Commands + VariableName.PunishCommand, typeof(string), _punishCommand),
+				new CPluginVariable(VariableGroup.Commands + VariableName.ForgiveCommand, typeof(string), _forgiveCommand),
 				new CPluginVariable(VariableGroup.Messages + VariableName.TeamKillMessage, typeof(string), _teamKillMessage),
 				new CPluginVariable(VariableGroup.Messages + VariableName.VictimPromptMessage, typeof(string), _victimPromptMessage),
 				new CPluginVariable(VariableGroup.Messages + VariableName.ShowStatsOnVictimPromptMessage, typeof(enumBoolYesNo), _showStatsOnVictimPromptMessage),
@@ -587,12 +601,12 @@ namespace PRoConEvents
 	p { font-size: 1em; }
 	p.default-value { color: #666; }
 	table th { text-transform: none; }
-	h2.group { color: #666; font-size: 1.4em; margin: 1em 0; padding-bottom: 0.3em; border-bottom: 1px solid #dcdcdb; }
+	h2.group { color: #666; font-size: 1.6em; margin: 1.5em 0 1em 0; padding-bottom: 0.3em; border-bottom: 1px solid #dcdcdb; }
 	h3 { font-size: 1.3em; }
 </style>
 
 <h2>Description</h2>
-<p>Track team kill stats and allow victims to punish team killers.</p>
+<p>Track team kill statistics and allow victims to punish their killers.</p>
 
 <h2>Plugin Settings</h2>
 
@@ -602,13 +616,13 @@ namespace PRoConEvents
 <p>The command to punish a team killer. This can be issued in global, team, or squad chat.</p>
 
 <h4>Default value</h4>
-<p class=""default-value"">!p</p>
+<p class=""default-value"">" + Defaults[VariableName.PunishCommand] + @"</p>
 
 <h3>" + VariableName.ForgiveCommand + @"</h3>
 <p>The command to forgive a team killer. This can be issued in global, team, or squad chat.</p>
 
 <h4>Default value</h4>
-<p class=""default-value"">!f</p>
+<p class=""default-value"">" + Defaults[VariableName.ForgiveCommand] + @"</p>
 
 <h2 class=""group"">Messages</h2>
 
@@ -640,7 +654,7 @@ namespace PRoConEvents
 </table>
 
 <h4>Default value</h4>
-<p class=""default-value"">{killer} TEAM KILLED {victim}. Watch your fire dum-dum! {killer} has TK'd a total of {killCount} {killCount:time|times}.</p>
+<p class=""default-value"">" + Defaults[VariableName.TeamKillMessage] + @"</p>
 
 <h3>" + VariableName.ShowStatsOnVictimPromptMessage + @"</h3>
 <p>Show extra information when a victim is prompted to punish or forgive to help them decide. This includes:</p>
@@ -651,13 +665,10 @@ namespace PRoConEvents
 </ul>
 
 <h4>Default value</h4>
-<p class=""default-value"">Yes</p>
+<p class=""default-value"">" + Defaults[VariableName.ShowStatsOnVictimPromptMessage] + @"</p>
 
 <h3>" + VariableName.NoOneToPunishMessage + @"</h3>
 <p>Message to display when a <em>punish</em> command is unsuccessful.</p>
-
-<h4>Default value</h4>
-<p class=""default-value"">No one to punish (auto-forgive after {window} seconds).</p>
 
 <h4>Available substitutions</h4>
 <table>
@@ -670,6 +681,9 @@ namespace PRoConEvents
 	<td>Length (in seconds) of the punish window.</td>
 </tr>
 </table>
+
+<h4>Default value</h4>
+<p class=""default-value"">" + Defaults[VariableName.NoOneToPunishMessage] + @"</p>
 
 <h3>" + VariableName.NoOneToForgiveMessage + @"</h3>
 <p>Message to display when a <em>forgive</em> command is unsuccessful.</p>
@@ -687,7 +701,7 @@ namespace PRoConEvents
 </table>
 
 <h4>Default value</h4>
-<p class=""default-value"">No one to forgive (auto-forgive after {window} seconds).</p>
+<p class=""default-value"">" + Defaults[VariableName.NoOneToForgiveMessage] + @"</p>
 
 <h3>" + VariableName.PunishedMessage + @"</h3>
 <p>Message to display when a <em>punish</em> command is successful.</p>
@@ -705,7 +719,7 @@ namespace PRoConEvents
 </table>
 
 <h4>Default value</h4>
-<p class=""default-value"">Punished {killer}.</p>
+<p class=""default-value"">" + Defaults[VariableName.PunishedMessage] + @"</p>
 
 <h3>" + VariableName.ForgivenMessage + @"</h3>
 <p>Message to display when a <em>forgive</em> command is successful.</p>
@@ -723,7 +737,7 @@ namespace PRoConEvents
 </table>
 
 <h4>Default value</h4>
-<p class=""default-value"">Forgiven {killer}.</p>
+<p class=""default-value"">" + Defaults[VariableName.ForgivenMessage] + @"</p>
 
 <h2 class=""group"">Timing</h2>
 
@@ -743,7 +757,7 @@ namespace PRoConEvents
 </table>
 
 <h4>Default value</h4>
-<p class=""default-value"">45</p>
+<p class=""default-value"">" + ((TimeSpan) Defaults[VariableName.PunishWindow]).TotalSeconds + @"</p>
 ";
 		}
 	}
