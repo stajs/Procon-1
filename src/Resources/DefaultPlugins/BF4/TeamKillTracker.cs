@@ -15,7 +15,7 @@ namespace PRoConEvents
 		private const int PunishWindowMin = 20;
 		private const int PunishWindowMax = 120;
 		private TimeSpan _punishWindow = TimeSpan.FromSeconds(45);
-		private string _victimAndKillerNotice = "{killer} TEAMKILLED {victim}. Watch your fire dum-dum! {killer} has TK'd a total of {killCount} {killCount:time|times}.";
+		private string _victimAndKillerNotice = "{killer} TEAM KILLED {victim}. Watch your fire dum-dum! {killer} has TK'd a total of {killCount} {killCount:time|times}.";
 		private enumBoolYesNo _showStatsOnVictimPrompt = enumBoolYesNo.Yes;
 
 		private struct VariableGroup
