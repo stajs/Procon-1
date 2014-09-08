@@ -214,8 +214,6 @@ namespace PRoConEvents
 
 		private void OnTeamKill(Kill kill)
 		{
-			const string prefix = "OnTeamKill | ";
-
 			if (kill == null || kill.Victim == null || kill.Killer == null)
 				return;
 
