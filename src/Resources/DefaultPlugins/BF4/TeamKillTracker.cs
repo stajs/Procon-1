@@ -47,12 +47,12 @@ namespace PRoConEvents
 
 		private const int PunishWindowMin = 20;
 		private const int PunishWindowMax = 120;
-		
+
 		private string _punishCommand = Defaults[VariableName.PunishCommand].ToString();
 		private string _forgiveCommand = Defaults[VariableName.ForgiveCommand].ToString();
 		private string _teamKillMessage = Defaults[VariableName.TeamKillMessage].ToString();
 		private string _victimPromptMessage = Defaults[VariableName.VictimPromptMessage].ToString();
-		private enumBoolYesNo _showStatsOnVictimPromptMessage = (enumBoolYesNo) Defaults[VariableName.ShowStatsOnVictimPromptMessage];
+		private enumBoolYesNo _showStatsOnVictimPromptMessage = (enumBoolYesNo)Defaults[VariableName.ShowStatsOnVictimPromptMessage];
 		private string _noOneToPunishMessage = Defaults[VariableName.NoOneToPunishMessage].ToString();
 		private string _noOneToForgiveMessage = Defaults[VariableName.NoOneToForgiveMessage].ToString();
 		private string _punishedMessage = Defaults[VariableName.PunishedMessage].ToString();
@@ -184,7 +184,7 @@ namespace PRoConEvents
 
 		public override void OnRoundOver(int winningTeamId)
 		{
-			Shame();
+			ShameAll();
 			_teamKills = new List<TeamKill>();
 		}
 
@@ -316,7 +316,7 @@ namespace PRoConEvents
 		private void OnChat(string speaker, string message)
 		{
 			if (message == "!shame")
-				Shame();
+				ShamePlayer(speaker);
 
 			// TODO: Remove.
 			if (speaker == "stajs" && message.StartsWith("!add"))
@@ -420,7 +420,7 @@ namespace PRoConEvents
 			kill.Status = TeamKillStatus.Forgiven;
 		}
 
-		private void Shame()
+		private string GetWorstTeamKillerMessage()
 		{
 			var worstTeamKillers = _teamKills
 				 .GroupBy(tk => tk.KillerName)
@@ -435,10 +435,7 @@ namespace PRoConEvents
 				 .ToList();
 
 			if (!worstTeamKillers.Any())
-			{
-				AdminSayAll("Wow! We got through a round without a single teamkill!");
-				return;
-			}
+				return "Wow! We got through a round without a single teamkill!";
 
 			var sb = new StringBuilder();
 
@@ -452,7 +449,17 @@ namespace PRoConEvents
 					  i + 1 < worstTeamKillers.Count ? ", " : ".");
 			}
 
-			AdminSayAll("Worst team killers: " + sb);
+			return "Worst team killers: " + sb;
+		}
+
+		private void ShamePlayer(string player)
+		{
+			AdminSayPlayer(player, GetWorstTeamKillerMessage());
+		}
+
+		private void ShameAll()
+		{
+			AdminSayAll(GetWorstTeamKillerMessage());
 		}
 
 		// TODO: Remove.
@@ -765,7 +772,7 @@ namespace PRoConEvents
 </table>
 
 <h4>Default value</h4>
-<p class=""default-value"">" + ((TimeSpan) Defaults[VariableName.PunishWindow]).TotalSeconds + @"</p>
+<p class=""default-value"">" + ((TimeSpan)Defaults[VariableName.PunishWindow]).TotalSeconds + @"</p>
 ";
 		}
 	}
