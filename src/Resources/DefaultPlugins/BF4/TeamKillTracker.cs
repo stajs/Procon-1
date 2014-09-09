@@ -53,7 +53,7 @@ namespace PRoConEvents
 		};
 
 		private const string Author = "stajs";
-		private const string Version = "0.2.1";
+		private const string Version = "0.2.2";
 
 		private const int PunishWindowMin = 20;
 		private const int PunishWindowMax = 120;
@@ -361,16 +361,16 @@ namespace PRoConEvents
 			AdminSayPlayer(victimName, _victimPromptMessage);
 		}
 
-		private void OnChat(string speaker, string message)
+		private void OnChat(string player, string message)
 		{
 			if (message == "!shame")
-				ShamePlayer(speaker);
+				AdminSayPlayer(player, GetWorstTeamKillerMessage());
 
 			if (message == (_punishCommand))
-				PunishKillerOf(speaker);
+				PunishKillerOf(player);
 
 			if (message == (_forgiveCommand))
-				ForgiveKillerOf(speaker);
+				ForgiveKillerOf(player);
 		}
 
 		private void AutoForgivePastPunishWindow()
@@ -436,26 +436,16 @@ namespace PRoConEvents
 			return privileges.CanKillPlayers;
 		}
 
-		private bool ShouldKickPlayer(string player)
-		{
-			if (_hasPunishLimit == enumBoolYesNo.No)
-				return false;
-
-			return GetPunishesLeftBeforeKick(player) == 1;
-		}
-
 		private void Kick(string player)
 		{
-			var kickedPlayer = _teamKills
-				.GroupBy(tk => tk.KillerName)
-				.Select(g => new TeamKiller
-				{
-					Name = player,
-					TeamKillCount = g.Count()
-				})
-				.First();
+			_kickedPlayers.Add(new TeamKiller
+			{
+				Name = player,
+				TeamKillCount = _teamKills.Count(tk => tk.KillerName == player),
+				Status = TeamKillerStatus.Kicked
+			});
 
-			_kickedPlayers.Add(kickedPlayer);
+			// Re-set their team kills in case they re-join.
 			_teamKills.RemoveAll(tk => tk.KillerName == player);
 
 			AdminSayAll("Too many team kills for " + player + ". Boot incoming!");
@@ -473,7 +463,11 @@ namespace PRoConEvents
 		{
 			var killer = kill.KillerName;
 
-			if (ShouldKickPlayer(killer))
+			var shouldKick =
+				_hasPunishLimit == enumBoolYesNo.Yes		// Limit is active.
+				&& GetPunishesLeftBeforeKick(killer) == 1;	// This is their last chance.
+
+			if (shouldKick)
 			{
 				Kick(killer);
 				return;
@@ -541,11 +535,6 @@ namespace PRoConEvents
 			}
 
 			return "Worst team killers: " + sb;
-		}
-
-		private void ShamePlayer(string player)
-		{
-			AdminSayPlayer(player, GetWorstTeamKillerMessage());
 		}
 
 		private void ShameAll()
