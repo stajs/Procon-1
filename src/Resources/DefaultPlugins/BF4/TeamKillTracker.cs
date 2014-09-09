@@ -290,7 +290,7 @@ namespace PRoConEvents
 			}
 			else
 			{
-				sb.AppendFormat(" TK's on you: {1}, TK's on team: {2}.", victimKillsByKiller.Count, allKillsByKiller.Count);
+				sb.AppendFormat(" TK's on you: {0}, TK's on team: {1}.", victimKillsByKiller.Count, allKillsByKiller.Count);
 				sb.AppendFormat(" Your stats for {0}", killer);
 
 				if (punishedCount > 0)
