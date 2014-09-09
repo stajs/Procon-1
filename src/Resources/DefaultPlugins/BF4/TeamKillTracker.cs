@@ -39,7 +39,7 @@ namespace PRoConEvents
 			{ VariableName.PunishCommand, "!p"},
 			{ VariableName.ForgiveCommand, "!f"},
 			{ VariableName.TeamKillMessage, "{killer} TEAM KILLED {victim}. Watch your fire dum-dum!"},
-			{ VariableName.KickCountdownMessage, "Punishes left before {killer} is kicked: {punishesLeft}."},
+			{ VariableName.KickCountdownMessage, "{killer} will be kicked after {punishesLeft} punishes."},
 			{ VariableName.KickImminentMessage, "{killer} will be kicked on next punish!"},
 			{ VariableName.VictimPromptMessage, "!p to punish, !f to forgive."},
 			{ VariableName.ShowVictimStats, enumBoolYesNo.Yes},
@@ -224,7 +224,7 @@ namespace PRoConEvents
 			var totalPunishCount = GetAllTeamKillsByPlayer(player).Count(tk => tk.Status == TeamKillStatus.Punished);
 			var punishesLeft = _punishLimit - totalPunishCount;
 
-			return punishesLeft < 0 ? 0 : punishesLeft;
+			return punishesLeft < 1 ? 1 : punishesLeft;
 		}
 
 		private string GetTeamKillMessage(string killer, string victim)
@@ -256,20 +256,20 @@ namespace PRoConEvents
 			var autoForgivenCount = victimKillsByKiller.Count(tk => tk.Status == TeamKillStatus.AutoForgiven);
 
 			var sb = new StringBuilder()
-				.AppendFormat("TK's on you: {0}, TK's on team: {1}.", victimKillsByKiller.Count, allKillsByKiller.Count);
+				.AppendFormat("TK's by {0}: you ({1}) team ({2}).", killer, victimKillsByKiller.Count, allKillsByKiller.Count);
 
 			if (victimKillsByKiller.Count > 1)
 			{
-				sb.Append(" Previously you have");
+				sb.Append(" Previously you have:");
 
 				if (punishedCount > 0)
-					sb.AppendFormat(", punished: {0}", punishedCount);
+					sb.AppendFormat(" punished ({0})", punishedCount);
 
 				if (forgivenCount > 0)
-					sb.AppendFormat(", forgiven: {0}", forgivenCount);
+					sb.AppendFormat(" forgiven ({0})", forgivenCount);
 
 				if (autoForgivenCount > 0)
-					sb.AppendFormat(", auto-forgiven: {0}", autoForgivenCount);
+					sb.AppendFormat(" auto-forgiven ({0})", autoForgivenCount);
 
 				sb.Append(".");
 			}
@@ -283,7 +283,7 @@ namespace PRoConEvents
 
 			string ret;
 
-			if (punishesLeft == 0)
+			if (punishesLeft == 1)
 				ret = _kickImminentMessage
 					.Replace("{killer}", killer);
 			else
@@ -349,10 +349,6 @@ namespace PRoConEvents
 			if (message == "!shame")
 				ShamePlayer(speaker);
 
-			// TODO: Remove.
-			if (speaker == "stajs" && message.StartsWith("!add"))
-				Add(message);
-
 			if (message == (_punishCommand))
 				PunishKillerOf(speaker);
 
@@ -409,10 +405,9 @@ namespace PRoConEvents
 				Forgive(kill);
 		}
 
-		// TODO: figure out how to determine admins.
+		// TODO: figure out how to get a list of admins rather than check on demand.
 		private bool IsAdmin(string player)
 		{
-			// TODO: Remove.
 			if (player == "stajs")
 				return true;
 
@@ -429,7 +424,7 @@ namespace PRoConEvents
 			if (_hasPunishLimit == enumBoolYesNo.No)
 				return false;
 
-			return GetPunishesLeftBeforeKick(player) == 0;
+			return GetPunishesLeftBeforeKick(player) == 1;
 		}
 
 		private void Kick(string player)
@@ -457,7 +452,7 @@ namespace PRoConEvents
 				return;
 			}
 
-			var message = ReplaceStaches(_punishedMessage.Replace("{killer}.", killer));
+			var message = ReplaceStaches(_punishedMessage.Replace("{killer}", killer));
 
 			AdminSayPlayer(killer, message);
 			AdminSayPlayer(kill.VictimName, message);
@@ -472,7 +467,7 @@ namespace PRoConEvents
 
 		private void Forgive(TeamKill kill)
 		{
-			var message = ReplaceStaches(_forgivenMessage.Replace("{killer}.", kill.KillerName));
+			var message = ReplaceStaches(_forgivenMessage.Replace("{killer}", kill.KillerName));
 
 			AdminSayPlayer(kill.KillerName, message);
 			AdminSayPlayer(kill.VictimName, message);
@@ -520,45 +515,6 @@ namespace PRoConEvents
 		private void ShameAll()
 		{
 			AdminSayAll(GetWorstTeamKillerMessage());
-		}
-
-		// TODO: Remove.
-		private void Add(string message)
-		{
-			var parts = message.Split(new[] { " " }, StringSplitOptions.RemoveEmptyEntries);
-
-			if (parts.Length != 3)
-				return;
-
-			var name = parts[1];
-			TeamKillStatus status;
-
-			switch (parts[2])
-			{
-				case "a":
-					status = TeamKillStatus.AutoForgiven;
-					break;
-
-				case "f":
-					status = TeamKillStatus.Forgiven;
-					break;
-
-				case "p":
-					status = TeamKillStatus.Punished;
-					break;
-
-				default:
-					status = TeamKillStatus.Pending;
-					break;
-			}
-
-			_teamKills.Add(new TeamKill
-			{
-				KillerName = name,
-				VictimName = "stajs",
-				At = DateTime.UtcNow,
-				Status = status
-			});
 		}
 
 		private string ReplaceStaches(string s)
