@@ -52,6 +52,9 @@ namespace PRoConEvents
 			{ VariableName.PunishLimit, 5},
 		};
 
+		private const string Author = "stajs";
+		private const string Version = "0.2.1";
+
 		private const int PunishWindowMin = 20;
 		private const int PunishWindowMax = 120;
 		private const int PunishLimitMin = 1;
@@ -73,6 +76,7 @@ namespace PRoConEvents
 		private int _punishLimit = (int)Defaults[VariableName.PunishLimit];
 
 		private List<TeamKill> _teamKills = new List<TeamKill>();
+		private List<TeamKiller> _kickedPlayers = new List<TeamKiller>();
 
 		private enum TeamKillStatus
 		{
@@ -88,6 +92,19 @@ namespace PRoConEvents
 			public string VictimName { get; set; }
 			public DateTime At { get; set; }
 			public TeamKillStatus Status { get; set; }
+		}
+
+		private enum TeamKillerStatus
+		{
+			Survived,
+			Kicked
+		}
+
+		private class TeamKiller
+		{
+			public string Name { get; set; }
+			public int TeamKillCount { get; set; }
+			public TeamKillerStatus Status { get; set; }
 		}
 
 		#region IPRoConPluginInterface
@@ -127,12 +144,12 @@ namespace PRoConEvents
 
 		public string GetPluginVersion()
 		{
-			return "0.2.0";
+			return Version;
 		}
 
 		public string GetPluginAuthor()
 		{
-			return "stajs";
+			return Author;
 		}
 
 		public string GetPluginWebsite()
@@ -408,7 +425,7 @@ namespace PRoConEvents
 		// TODO: figure out how to get a list of admins rather than check on demand.
 		private bool IsAdmin(string player)
 		{
-			if (player == "stajs")
+			if (player == Author)
 				return true;
 
 			var privileges = GetAccountPrivileges(player);
@@ -429,6 +446,16 @@ namespace PRoConEvents
 
 		private void Kick(string player)
 		{
+			var kickedPlayer = _teamKills
+				.GroupBy(tk => tk.KillerName)
+				.Select(g => new TeamKiller
+				{
+					Name = player,
+					TeamKillCount = g.Count()
+				})
+				.First();
+
+			_kickedPlayers.Add(kickedPlayer);
 			_teamKills.RemoveAll(tk => tk.KillerName == player);
 
 			AdminSayAll("Too many team kills for " + player + ". Boot incoming!");
@@ -479,13 +506,21 @@ namespace PRoConEvents
 		{
 			var worstTeamKillers = _teamKills
 				 .GroupBy(tk => tk.KillerName)
-				 .Select(g => new
+				 .Select(g => new TeamKiller
 				 {
-					 KillerName = g.Key,
-					 Count = g.Count(),
-					 TeamKills = g
+					 Name = g.Key,
+					 TeamKillCount = g.Count(),
+					 Status = TeamKillerStatus.Survived
 				 })
-				 .OrderByDescending(a => a.Count)
+				 .OrderByDescending(tk => tk.TeamKillCount)
+				 .Take(3)
+				 .ToList();
+
+			worstTeamKillers
+				 .AddRange(_kickedPlayers);
+
+			worstTeamKillers = worstTeamKillers
+				 .OrderByDescending(tk => tk.TeamKillCount)
 				 .Take(3)
 				 .ToList();
 
@@ -498,9 +533,10 @@ namespace PRoConEvents
 			{
 				var killer = worstTeamKillers[i];
 
-				sb.AppendFormat("{0} ({1}){2}",
-					  killer.KillerName,
-					  killer.Count,
+				sb.AppendFormat("{0} ({1}){2}{3}",
+					  killer.Name,
+					  killer.TeamKillCount,
+					  killer.Status == TeamKillerStatus.Kicked ? " kicked" : string.Empty,
 					  i + 1 < worstTeamKillers.Count ? ", " : ".");
 			}
 
