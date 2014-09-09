@@ -182,6 +182,7 @@ namespace PRoConEvents
 		public override void OnLevelLoaded(string mapFileName, string gamemode, int roundsPlayed, int roundsTotal)
 		{
 			WriteConsole("OnLevelLoaded " + mapFileName + ", " + gamemode);
+			_teamKills = new List<TeamKill>();
 		}
 
 		// TODO: Confirm that this is round start.
@@ -193,7 +194,6 @@ namespace PRoConEvents
 		public override void OnRoundOver(int winningTeamId)
 		{
 			ShameAll();
-			_teamKills = new List<TeamKill>();
 		}
 
 		public override void OnPlayerKilled(Kill kill)
@@ -242,6 +242,13 @@ namespace PRoConEvents
 			return ReplaceStaches(ret);
 		}
 
+		private List<TeamKill> GetAllTeamKillsByPlayer(string player)
+		{
+			return _teamKills
+				.Where(tk => tk.KillerName == player)
+				.ToList();
+		}
+
 		private void OnTeamKill(Kill kill)
 		{
 			if (kill == null || kill.Victim == null || kill.Killer == null)
@@ -274,9 +281,7 @@ namespace PRoConEvents
 				Status = TeamKillStatus.Pending
 			});
 
-			var allKillsByKiller = _teamKills
-				.Where(tk => tk.KillerName == killerName)
-				.ToList();
+			var allKillsByKiller = GetAllTeamKillsByPlayer(killerName);
 
 			var message = GetTeamKillMessage(killerName, victimName, allKillsByKiller.Count);
 
@@ -397,25 +402,55 @@ namespace PRoConEvents
 			return privileges.CanKillPlayers;
 		}
 
+		private bool ShouldKickPlayer(string player)
+		{
+			if (_hasPunishLimit == enumBoolYesNo.No)
+				return false;
+
+			var totalPunishedCount = GetAllTeamKillsByPlayer(player)
+				.Count(tk => tk.Status == TeamKillStatus.Punished);
+
+			var punishesLeft = _punishLimit - totalPunishedCount;
+
+			return punishesLeft <= 0;
+		}
+
+		private void Kick(string player)
+		{
+			_teamKills.RemoveAll(tk => tk.KillerName == player);
+
+
+			if (IsAdmin(player))
+			{
+				AdminSayPlayer(player, "Protected from kick.");
+				return;
+			}
+
+			AdminSayAll("Too many team kills for " + player + ". Say buh-bye: Boot incoming!");
+			ExecuteCommand("procon.protected.tasks.add", "TeamKillTracker", "20", "1", "1", "procon.protected.send", "admin.kickPlayer", player, "Kicked for reaching team kill limit.");
+		}
+
 		private void Punish(TeamKill kill)
 		{
-			var message = ReplaceStaches(_punishedMessage.Replace("{killer}.", kill.KillerName));
+			var killer = kill.KillerName;
 
-			// TODO: auto kick.
-			//const int maxPunish = 5;
-			//var totalPunishedCount = allKillsByKiller.Count(tk => tk.Status == TeamKillStatus.Punished);
-			//var punishesLeft = maxPunish - totalPunishedCount;
-			//    ExecuteCommand("procon.protected.tasks.add", "TeamKillTracker", "5", "1", "1", "procon.protected.send", "admin.kickPlayer", strSoldierName, "Boot!");
+			if (ShouldKickPlayer(killer))
+			{
+				Kick(killer);
+				return;
+			}
 
-			AdminSayPlayer(kill.KillerName, message);
+			var message = ReplaceStaches(_punishedMessage.Replace("{killer}.", killer));
+
+			AdminSayPlayer(killer, message);
 			AdminSayPlayer(kill.VictimName, message);
 
 			kill.Status = TeamKillStatus.Punished;
 
-			if (IsAdmin(kill.KillerName))
-				AdminSayPlayer(kill.KillerName, "Protected from kill.");
+			if (IsAdmin(killer))
+				AdminSayPlayer(killer, "Protected from kill.");
 			else
-				ExecuteCommand("procon.protected.send", "admin.killPlayer", kill.KillerName);
+				ExecuteCommand("procon.protected.send", "admin.killPlayer", killer);
 		}
 
 		private void Forgive(TeamKill kill)
