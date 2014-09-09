@@ -254,9 +254,8 @@ namespace PRoConEvents
 			if (kill == null || kill.Victim == null || kill.Killer == null)
 				return;
 
-			// TODO: Uncomment. Commented out for testing.
-			//if (kill.IsSuicide)
-			//	return;
+			if (kill.IsSuicide)
+				return;
 
 			var victimName = kill.Victim.SoldierName;
 			var killerName = kill.Killer.SoldierName;
