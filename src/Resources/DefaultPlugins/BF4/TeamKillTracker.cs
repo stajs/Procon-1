@@ -22,6 +22,7 @@ namespace PRoConEvents
 			public const string PunishCommand = "Punish";
 			public const string ForgiveCommand = "Forgive";
 			public const string TeamKillMessage = "Team kill";
+			public const string KickWarningMessage = "Kick warning";
 			public const string VictimPromptMessage = "Victim prompt";
 			public const string ShowStatsOnVictimPromptMessage = "Show stats on victim prompt?";
 			public const string NoOneToPunishMessage = "No one to punish";
@@ -38,6 +39,7 @@ namespace PRoConEvents
 			{ VariableName.PunishCommand, "!p"},
 			{ VariableName.ForgiveCommand, "!f"},
 			{ VariableName.TeamKillMessage, "{killer} TEAM KILLED {victim}. Watch your fire dum-dum! {killer} has TK'd a total of {killCount} {killCount:time|times}."},
+			{ VariableName.KickWarningMessage, "Punishes left before kick: {punishesLeft}."},
 			{ VariableName.VictimPromptMessage, "!p to punish, !f to forgive."},
 			{ VariableName.ShowStatsOnVictimPromptMessage, enumBoolYesNo.Yes},
 			{ VariableName.NoOneToPunishMessage, "No one to punish (auto-forgive after {window} seconds)."},
@@ -57,6 +59,7 @@ namespace PRoConEvents
 		private string _punishCommand = Defaults[VariableName.PunishCommand].ToString();
 		private string _forgiveCommand = Defaults[VariableName.ForgiveCommand].ToString();
 		private string _teamKillMessage = Defaults[VariableName.TeamKillMessage].ToString();
+		private string _kickWarningMessage = Defaults[VariableName.KickWarningMessage].ToString();
 		private string _victimPromptMessage = Defaults[VariableName.VictimPromptMessage].ToString();
 		private enumBoolYesNo _showStatsOnVictimPromptMessage = (enumBoolYesNo)Defaults[VariableName.ShowStatsOnVictimPromptMessage];
 		private string _noOneToPunishMessage = Defaults[VariableName.NoOneToPunishMessage].ToString();
@@ -211,8 +214,21 @@ namespace PRoConEvents
 				.ForEach(tk => tk.Status = TeamKillStatus.AutoForgiven);
 		}
 
-		private string GetTeamKillMessage(string killer, string victim, int killCount)
+		private int GetPunishesLeftBeforeKick(string player)
 		{
+			if (_hasPunishLimit == enumBoolYesNo.No)
+				return 9999;
+
+			var totalPunishCount = GetAllTeamKillsByPlayer(player).Count(tk => tk.Status == TeamKillStatus.Punished);
+			var punishesLeft = _punishLimit - totalPunishCount;
+
+			return punishesLeft < 0 ? 0 : punishesLeft;
+		}
+
+		private string GetTeamKillMessage(string killer, string victim)
+		{
+			var killCount = GetAllTeamKillsByPlayer(killer).Count();
+
 			var ret = _teamKillMessage
 				.Replace("{killer}", killer)
 				.Replace("{victim}", victim)
@@ -249,6 +265,55 @@ namespace PRoConEvents
 				.ToList();
 		}
 
+		private string GetVictimPromptMessage(string killer, string victim)
+		{
+			var sb = new StringBuilder(victim)
+				.Append(": ")
+				.Append(_victimPromptMessage);
+
+			if (_showStatsOnVictimPromptMessage == enumBoolYesNo.No)
+				return sb.ToString();
+
+			var allKillsByKiller = GetAllTeamKillsByPlayer(killer);
+
+			var victimKillsByKiller = allKillsByKiller
+				.Where(tk => tk.VictimName == victim)
+				.ToList();
+
+			var punishedCount = victimKillsByKiller.Count(tk => tk.Status == TeamKillStatus.Punished);
+			var forgivenCount = victimKillsByKiller.Count(tk => tk.Status == TeamKillStatus.Forgiven);
+			var autoForgivenCount = victimKillsByKiller.Count(tk => tk.Status == TeamKillStatus.AutoForgiven);
+
+			if (victimKillsByKiller.Count == 0)
+			{
+				sb.AppendFormat(" This is the first time {0} has TK'd you.", killer);
+			}
+			else
+			{
+				sb.AppendFormat(" TK's on you: {1}, TK's on team: {2}.", victimKillsByKiller.Count, allKillsByKiller.Count);
+				sb.AppendFormat(" Your stats for {0}", killer);
+
+				if (punishedCount > 0)
+					sb.AppendFormat(", punished: {0}", punishedCount);
+
+				if (forgivenCount > 0)
+					sb.AppendFormat(", forgiven: {0}", forgivenCount);
+
+				if (autoForgivenCount > 0)
+					sb.AppendFormat(", auto-forgiven: {0}", autoForgivenCount);
+
+				sb.Append(".");
+			}
+
+			return sb.ToString();
+		}
+
+		private string GetKickWarningMessage(string killer)
+		{
+			var punishesLeft = GetPunishesLeftBeforeKick(killer);
+			return ReplaceStaches(_kickWarningMessage.Replace("{punishesLeft}", punishesLeft.ToString()));
+		}
+
 		private void OnTeamKill(Kill kill)
 		{
 			if (kill == null || kill.Victim == null || kill.Killer == null)
@@ -280,49 +345,14 @@ namespace PRoConEvents
 				Status = TeamKillStatus.Pending
 			});
 
-			var allKillsByKiller = GetAllTeamKillsByPlayer(killerName);
-
-			var message = GetTeamKillMessage(killerName, victimName, allKillsByKiller.Count);
+			var message = GetTeamKillMessage(killerName, victimName);
 
 			AdminSayPlayer(killerName, message);
 			AdminSayPlayer(victimName, message);
+			AdminSayPlayer(victimName, GetVictimPromptMessage(killerName, victimName));
 
-			var sb = new StringBuilder(victimName)
-				.Append(": ")
-				.Append(_victimPromptMessage);
-
-			if (_showStatsOnVictimPromptMessage == enumBoolYesNo.Yes)
-			{
-				var victimKillsByKiller = allKillsByKiller
-					.Where(tk => tk.VictimName == victimName)
-					.ToList();
-
-				var punishedCount = victimKillsByKiller.Count(tk => tk.Status == TeamKillStatus.Punished);
-				var forgivenCount = victimKillsByKiller.Count(tk => tk.Status == TeamKillStatus.Forgiven);
-				var autoForgivenCount = victimKillsByKiller.Count(tk => tk.Status == TeamKillStatus.AutoForgiven);
-
-				if (victimKillsByKiller.Count == 0)
-				{
-					sb.AppendFormat(" This is the first time {0} has TK'd you.", killerName);
-				}
-				else
-				{
-					sb.AppendFormat(" Previous stats - TK's by {0} on you: {1}", killerName, victimKillsByKiller.Count);
-
-					if (punishedCount > 0)
-						sb.AppendFormat(", punished: {0}", punishedCount);
-
-					if (forgivenCount > 0)
-						sb.AppendFormat(", forgiven: {0}", forgivenCount);
-
-					if (autoForgivenCount > 0)
-						sb.AppendFormat(", auto-forgiven: {0}", autoForgivenCount);
-
-					sb.Append(".");
-				}
-			}
-
-			AdminSayPlayer(victimName, sb.ToString());
+			if (_hasPunishLimit == enumBoolYesNo.Yes)
+				AdminSayPlayer(killerName, GetKickWarningMessage(killerName));
 		}
 
 		private void OnChat(string speaker, string message)
@@ -575,6 +605,7 @@ namespace PRoConEvents
 				new CPluginVariable(VariableGroup.Commands + VariableName.PunishCommand, typeof(string), _punishCommand),
 				new CPluginVariable(VariableGroup.Commands + VariableName.ForgiveCommand, typeof(string), _forgiveCommand),
 				new CPluginVariable(VariableGroup.Messages + VariableName.TeamKillMessage, typeof(string), _teamKillMessage),
+				new CPluginVariable(VariableGroup.Messages + VariableName.KickWarningMessage, typeof(string), _kickWarningMessage),
 				new CPluginVariable(VariableGroup.Messages + VariableName.VictimPromptMessage, typeof(string), _victimPromptMessage),
 				new CPluginVariable(VariableGroup.Messages + VariableName.ShowStatsOnVictimPromptMessage, typeof(enumBoolYesNo), _showStatsOnVictimPromptMessage),
 				new CPluginVariable(VariableGroup.Messages + VariableName.PunishedMessage, typeof(string), _punishedMessage),
@@ -595,6 +626,10 @@ namespace PRoConEvents
 			{
 				case VariableName.TeamKillMessage:
 					_teamKillMessage = value;
+					break;
+
+				case VariableName.KickWarningMessage:
+					_kickWarningMessage = value;
 					break;
 
 				case VariableName.ShowStatsOnVictimPromptMessage:
@@ -729,6 +764,24 @@ namespace PRoConEvents
 
 <h4>Default value</h4>
 <p class=""default-value"">" + Defaults[VariableName.TeamKillMessage] + @"</p>
+
+<h3>" + VariableName.KickWarningMessage + @"</h3>
+<p>Sent to the killer, if <strong>" + Defaults[VariableName.HasPunishLimit] + @"</strong> is set to <strong>Yes</strong>.</p>
+
+<h4>Available substitutions</h4>
+<table>
+<tr>
+	<th>Placeholder</th>
+	<th>Description</th>
+</tr>
+<tr>
+	<td><strong>{punishesLeft}</strong></td>
+	<td>The number of punishes left before the killer is kicked.</td>
+</tr>
+</table>
+
+<h4>Default value</h4>
+<p class=""default-value"">" + Defaults[VariableName.KickWarningMessage] + @"</p>
 
 <h3>" + VariableName.VictimPromptMessage + @"</h3>
 <p>Sent to the victim when a team kill is detected.</p>
