@@ -9,6 +9,14 @@ namespace PRoConEvents
 {
 	public class TeamKillTracker : PRoConPluginAPI, IPRoConPluginInterface
 	{
+		private const string Author = "stajs";
+		private const string Version = "0.2.3";
+		
+		private const int PunishWindowMin = 20;
+		private const int PunishWindowMax = 120;
+		private const int PunishLimitMin = 1;
+		private const int PunishLimitMax = 20;
+
 		private struct VariableGroup
 		{
 			public const string Commands = "Commands|";
@@ -56,14 +64,6 @@ namespace PRoConEvents
 			{ VariableName.Protected, Protect.Admins},
 			{ VariableName.Whitelist, new string[] {}},
 		};
-
-		private const string Author = "stajs";
-		private const string Version = "0.2.2";
-
-		private const int PunishWindowMin = 20;
-		private const int PunishWindowMax = 120;
-		private const int PunishLimitMin = 1;
-		private const int PunishLimitMax = 20;
 
 		private string _punishCommand = Defaults[VariableName.PunishCommand].ToString();
 		private string _forgiveCommand = Defaults[VariableName.ForgiveCommand].ToString();
