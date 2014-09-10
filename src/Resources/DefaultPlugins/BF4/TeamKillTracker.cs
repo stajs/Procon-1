@@ -14,7 +14,7 @@ namespace PRoConEvents
 			public const string Commands = "Commands|";
 			public const string Messages = "Messages|";
 			public const string Limits = "Limits|";
-			public const string Whitelist = "Whitelist|";
+			public const string Protection = "Protection|";
 		}
 
 		private struct VariableName
@@ -33,7 +33,8 @@ namespace PRoConEvents
 			public const string PunishWindow = "Punish window (seconds)";
 			public const string HasPunishLimit = "Kick after punish limit reached?";
 			public const string PunishLimit = "Punish limit";
-			public const string ProtectedPlayers = "Protected players";
+			public const string Protected = "Who should be protected?";
+			public const string Whitelist = "Whitelist";
 		}
 
 		private static readonly Dictionary<string, object> Defaults = new Dictionary<string, object>
@@ -52,7 +53,8 @@ namespace PRoConEvents
 			{ VariableName.PunishWindow, TimeSpan.FromSeconds(45)},
 			{ VariableName.HasPunishLimit, enumBoolYesNo.Yes},
 			{ VariableName.PunishLimit, 5},
-			{ VariableName.ProtectedPlayers, new string[] {}},
+			{ VariableName.Protected, Protect.Admins},
+			{ VariableName.Whitelist, new string[] {}},
 		};
 
 		private const string Author = "stajs";
@@ -77,7 +79,8 @@ namespace PRoConEvents
 		private TimeSpan _punishWindow = (TimeSpan)Defaults[VariableName.PunishWindow];
 		private enumBoolYesNo _hasPunishLimit = (enumBoolYesNo)Defaults[VariableName.HasPunishLimit];
 		private int _punishLimit = (int)Defaults[VariableName.PunishLimit];
-		private string[] _protectedPlayers = (string[])Defaults[VariableName.ProtectedPlayers];
+		private Protect _protect = (Protect)Defaults[VariableName.Protected];
+		private string[] _whitelist = (string[])Defaults[VariableName.Whitelist];
 
 		private List<TeamKill> _teamKills = new List<TeamKill>();
 		private List<TeamKiller> _kickedPlayers = new List<TeamKiller>();
@@ -109,6 +112,14 @@ namespace PRoConEvents
 			public string Name { get; set; }
 			public int TeamKillCount { get; set; }
 			public TeamKillerStatus Status { get; set; }
+		}
+
+		private enum Protect
+		{
+			NoOne,
+			Admins,
+			Whitelist,
+			AdminsAndWhitelist
 		}
 
 		#region IPRoConPluginInterface
@@ -589,7 +600,8 @@ namespace PRoConEvents
 				new CPluginVariable(VariableGroup.Limits + VariableName.PunishWindow, typeof(int), _punishWindow.TotalSeconds),
 				new CPluginVariable(VariableGroup.Limits + VariableName.HasPunishLimit, typeof(enumBoolYesNo), _hasPunishLimit),
 				new CPluginVariable(VariableGroup.Limits + VariableName.PunishLimit, typeof(int), _punishLimit),
-				new CPluginVariable(VariableGroup.Whitelist + VariableName.ProtectedPlayers, typeof(string[]), _protectedPlayers.ToArray())
+				new CPluginVariable(VariableGroup.Protection + VariableName.Protected, CreateEnumString(typeof(Protect)), _protect.ToString()),
+				new CPluginVariable(VariableGroup.Protection + VariableName.Whitelist, typeof(string[]), _whitelist.ToArray())
 			};
 		}
 
@@ -677,8 +689,12 @@ namespace PRoConEvents
 
 					break;
 
-				case VariableName.ProtectedPlayers:
-					_protectedPlayers = value.Split(new [] {"|"}, StringSplitOptions.RemoveEmptyEntries);
+				case VariableName.Protected:
+					_protect = (Protect) Enum.Parse(typeof(Protect), value);
+					break;
+
+				case VariableName.Whitelist:
+					_whitelist = CPluginVariable.DecodeStringArray(value);
 					break;
 			}
 		}
@@ -922,11 +938,16 @@ namespace PRoConEvents
 <h4>Default value</h4>
 <p class=""default-value"">" + Defaults[VariableName.PunishLimit] + @"</p>
 
-<h2 class=""group"">Whitelist</h2>
+<h2 class=""group"">Protection</h2>
 
-<h3>" + VariableName.ProtectedPlayers + @"</h3>
-<p>A list of players (one per line) that are protected from punishment.</p>
-<p><strong>NOTE:</strong> Procons internal implementation of these multi-line settings, means you will likely have trouble adding a player with pipe character (""|"") in their name.</p>";
+<h3>" + VariableName.Protected + @"</h3>
+<p>Who, if any, should be protected from punishment.</p>
+
+<h4>Default value</h4>
+<p class=""default-value"">" + Defaults[VariableName.Protected] + @"</p>
+
+<h3>" + VariableName.Whitelist + @"</h3>
+<p>A list of players (one per line) that are protected from punishment.</p>";
 		}
 	}
 }
