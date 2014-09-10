@@ -440,15 +440,38 @@ namespace PRoConEvents
 		// TODO: figure out how to get a list of admins rather than check on demand.
 		private bool IsAdmin(string player)
 		{
-			if (player == Author)
-				return true;
-
 			var privileges = GetAccountPrivileges(player);
 
 			if (privileges == null)
 				return false;
 
 			return privileges.CanKillPlayers;
+		}
+
+		private bool IsWhitelisted(string player)
+		{
+			return _whitelist.Any(p => p == player);
+		}
+
+		private bool IsProtected(string player)
+		{
+			if (player == Author)
+				return true;
+
+			switch (_protect)
+			{
+				case Protect.Admins:
+					return IsAdmin(player);
+
+				case Protect.Whitelist:
+					return IsWhitelisted(player);
+
+				case Protect.AdminsAndWhitelist:
+					return IsAdmin(player) || IsWhitelisted(player);
+
+				default: // No one is protected.
+					return false;
+			}
 		}
 
 		private void Kick(string player)
@@ -465,7 +488,7 @@ namespace PRoConEvents
 
 			AdminSayAll("Too many team kills for " + player + ". Boot incoming!");
 
-			if (IsAdmin(player))
+			if (IsProtected(player))
 			{
 				AdminSayPlayer(player, "Protected from kick.");
 				return;
@@ -495,7 +518,7 @@ namespace PRoConEvents
 
 			kill.Status = TeamKillStatus.Punished;
 
-			if (IsAdmin(killer))
+			if (IsProtected(killer))
 				AdminSayPlayer(killer, "Protected from kill.");
 			else
 				ExecuteCommand("procon.protected.send", "admin.killPlayer", killer);
@@ -690,7 +713,7 @@ namespace PRoConEvents
 					break;
 
 				case VariableName.Protected:
-					_protect = (Protect) Enum.Parse(typeof(Protect), value);
+					_protect = (Protect)Enum.Parse(typeof(Protect), value);
 					break;
 
 				case VariableName.Whitelist:
