@@ -9,8 +9,8 @@ namespace PRoConEvents
 {
 	public class TeamKillTracker : PRoConPluginAPI, IPRoConPluginInterface
 	{
-		private const string Author = "stajs";
-		private const string Version = "0.2.3";
+		public const string Author = "stajs";
+		public const string Version = "0.2.3";
 		
 		private const int PunishWindowMin = 20;
 		private const int PunishWindowMax = 120;
@@ -722,7 +722,7 @@ namespace PRoConEvents
 			}
 		}
 
-		private string GetDescriptionHtml()
+		public string GetDescriptionHtml()
 		{
 			return @"
 
@@ -782,7 +782,7 @@ namespace PRoConEvents
 <h3>" + VariableName.KickCountdownMessage + @"</h3>
 <p>Sent to the killer and victim when a team kill is detected, if:</p>
 <ol>
-	<li><em>" + VariableName.HasPunishLimit + @"</em> is set to <em>Yes</em>.</p>
+	<li><em>" + VariableName.HasPunishLimit + @"</em> is set to <em>Yes</em>.</li>
 	<li>The killer is more than one punish away from the limit.</li>
 </ol>
 
@@ -808,7 +808,7 @@ namespace PRoConEvents
 <h3>" + VariableName.KickImminentMessage + @"</h3>
 <p>Sent to the killer and victim when a team kill is detected, if:</p>
 <ol>
-	<li><em>" + VariableName.HasPunishLimit + @"</em> is set to <em>Yes</em>.</p>
+	<li><em>" + VariableName.HasPunishLimit + @"</em> is set to <em>Yes</em>.</li>
 	<li>The killer is one punish away from the limit.</li>
 </ol>
 
