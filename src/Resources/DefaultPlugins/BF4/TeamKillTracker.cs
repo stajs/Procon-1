@@ -10,8 +10,8 @@ namespace PRoConEvents
 	public class TeamKillTracker : PRoConPluginAPI, IPRoConPluginInterface
 	{
 		public const string Author = "stajs";
-		public const string Version = "0.2.3";
-		
+		public const string Version = "0.2.4";
+
 		private const int PunishWindowMin = 20;
 		private const int PunishWindowMax = 120;
 		private const int PunishLimitMin = 1;
@@ -179,12 +179,48 @@ namespace PRoConEvents
 
 		public List<CPluginVariable> GetDisplayPluginVariables()
 		{
-			return GetSettings();
+			return new List<CPluginVariable>
+			{
+				new CPluginVariable(VariableGroup.Commands + VariableName.PunishCommand, typeof(string), _punishCommand),
+				new CPluginVariable(VariableGroup.Commands + VariableName.ForgiveCommand, typeof(string), _forgiveCommand),
+				new CPluginVariable(VariableGroup.Messages + VariableName.TeamKillMessage, typeof(string), _teamKillMessage),
+				new CPluginVariable(VariableGroup.Messages + VariableName.KickCountdownMessage, typeof(string), _kickCountdownMessage),
+				new CPluginVariable(VariableGroup.Messages + VariableName.KickImminentMessage, typeof(string), _kickImminentMessage),
+				new CPluginVariable(VariableGroup.Messages + VariableName.VictimPromptMessage, typeof(string), _victimPromptMessage),
+				new CPluginVariable(VariableGroup.Messages + VariableName.ShowVictimStats, typeof(enumBoolYesNo), _showVictimStats),
+				new CPluginVariable(VariableGroup.Messages + VariableName.PunishedMessage, typeof(string), _punishedMessage),
+				new CPluginVariable(VariableGroup.Messages + VariableName.ForgivenMessage, typeof(string), _forgivenMessage),
+				new CPluginVariable(VariableGroup.Messages + VariableName.NoOneToPunishMessage, typeof(string), _noOneToPunishMessage),
+				new CPluginVariable(VariableGroup.Messages + VariableName.NoOneToForgiveMessage, typeof(string), _noOneToForgiveMessage),
+				new CPluginVariable(VariableGroup.Limits + VariableName.PunishWindow, typeof(int), _punishWindow.TotalSeconds),
+				new CPluginVariable(VariableGroup.Limits + VariableName.HasPunishLimit, typeof(enumBoolYesNo), _hasPunishLimit),
+				new CPluginVariable(VariableGroup.Limits + VariableName.PunishLimit, typeof(int), _punishLimit),
+				new CPluginVariable(VariableGroup.Protection + VariableName.Protected, CreateEnumString(typeof(Protect)), _protect.ToString()),
+				new CPluginVariable(VariableGroup.Protection + VariableName.Whitelist, typeof(string[]), _whitelist.ToArray())
+			};
 		}
 
 		public List<CPluginVariable> GetPluginVariables()
 		{
-			return GetSettings();
+			return new List<CPluginVariable>
+			{
+				new CPluginVariable(VariableName.PunishCommand, typeof(string), _punishCommand),
+				new CPluginVariable(VariableName.ForgiveCommand, typeof(string), _forgiveCommand),
+				new CPluginVariable(VariableName.TeamKillMessage, typeof(string), _teamKillMessage),
+				new CPluginVariable(VariableName.KickCountdownMessage, typeof(string), _kickCountdownMessage),
+				new CPluginVariable(VariableName.KickImminentMessage, typeof(string), _kickImminentMessage),
+				new CPluginVariable(VariableName.VictimPromptMessage, typeof(string), _victimPromptMessage),
+				new CPluginVariable(VariableName.ShowVictimStats, typeof(enumBoolYesNo), _showVictimStats),
+				new CPluginVariable(VariableName.PunishedMessage, typeof(string), _punishedMessage),
+				new CPluginVariable(VariableName.ForgivenMessage, typeof(string), _forgivenMessage),
+				new CPluginVariable(VariableName.NoOneToPunishMessage, typeof(string), _noOneToPunishMessage),
+				new CPluginVariable(VariableName.NoOneToForgiveMessage, typeof(string), _noOneToForgiveMessage),
+				new CPluginVariable(VariableName.PunishWindow, typeof(int), _punishWindow.TotalSeconds),
+				new CPluginVariable(VariableName.HasPunishLimit, typeof(enumBoolYesNo), _hasPunishLimit),
+				new CPluginVariable(VariableName.PunishLimit, typeof(int), _punishLimit),
+				new CPluginVariable(VariableName.Protected, CreateEnumString(typeof(Protect)), _protect.ToString()),
+				new CPluginVariable(VariableName.Whitelist, typeof(string[]), _whitelist.ToArray())
+			};
 		}
 
 		public void SetPluginVariable(string variable, string value)
@@ -603,29 +639,6 @@ namespace PRoConEvents
 			message = ReplaceStaches(message);
 			ExecuteCommand("procon.protected.send", "admin.say", message, "player", player);
 			ExecuteCommand("procon.protected.chat.write", "(AdminSayPlayer " + player + ") " + message);
-		}
-
-		private List<CPluginVariable> GetSettings()
-		{
-			return new List<CPluginVariable>
-			{
-				new CPluginVariable(VariableGroup.Commands + VariableName.PunishCommand, typeof(string), _punishCommand),
-				new CPluginVariable(VariableGroup.Commands + VariableName.ForgiveCommand, typeof(string), _forgiveCommand),
-				new CPluginVariable(VariableGroup.Messages + VariableName.TeamKillMessage, typeof(string), _teamKillMessage),
-				new CPluginVariable(VariableGroup.Messages + VariableName.KickCountdownMessage, typeof(string), _kickCountdownMessage),
-				new CPluginVariable(VariableGroup.Messages + VariableName.KickImminentMessage, typeof(string), _kickImminentMessage),
-				new CPluginVariable(VariableGroup.Messages + VariableName.VictimPromptMessage, typeof(string), _victimPromptMessage),
-				new CPluginVariable(VariableGroup.Messages + VariableName.ShowVictimStats, typeof(enumBoolYesNo), _showVictimStats),
-				new CPluginVariable(VariableGroup.Messages + VariableName.PunishedMessage, typeof(string), _punishedMessage),
-				new CPluginVariable(VariableGroup.Messages + VariableName.ForgivenMessage, typeof(string), _forgivenMessage),
-				new CPluginVariable(VariableGroup.Messages + VariableName.NoOneToPunishMessage, typeof(string), _noOneToPunishMessage),
-				new CPluginVariable(VariableGroup.Messages + VariableName.NoOneToForgiveMessage, typeof(string), _noOneToForgiveMessage),
-				new CPluginVariable(VariableGroup.Limits + VariableName.PunishWindow, typeof(int), _punishWindow.TotalSeconds),
-				new CPluginVariable(VariableGroup.Limits + VariableName.HasPunishLimit, typeof(enumBoolYesNo), _hasPunishLimit),
-				new CPluginVariable(VariableGroup.Limits + VariableName.PunishLimit, typeof(int), _punishLimit),
-				new CPluginVariable(VariableGroup.Protection + VariableName.Protected, CreateEnumString(typeof(Protect)), _protect.ToString()),
-				new CPluginVariable(VariableGroup.Protection + VariableName.Whitelist, typeof(string[]), _whitelist.ToArray())
-			};
 		}
 
 		private void SaveSetting(string setting, string value)
