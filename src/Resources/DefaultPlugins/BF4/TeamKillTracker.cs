@@ -10,7 +10,7 @@ namespace PRoConEvents
 	public class TeamKillTracker : PRoConPluginAPI, IPRoConPluginInterface
 	{
 		public const string Author = "stajs";
-		public const string Version = "0.2.4";
+		public const string Version = "0.2.5";
 
 		private const int PunishWindowMin = 20;
 		private const int PunishWindowMax = 120;
@@ -179,6 +179,16 @@ namespace PRoConEvents
 
 		public List<CPluginVariable> GetDisplayPluginVariables()
 		{
+			return GetVariables();
+		}
+
+		public List<CPluginVariable> GetPluginVariables()
+		{
+			return GetVariables();
+		}
+
+		private List<CPluginVariable> GetVariables()
+		{
 			return new List<CPluginVariable>
 			{
 				new CPluginVariable(VariableGroup.Commands + VariableName.PunishCommand, typeof(string), _punishCommand),
@@ -200,32 +210,98 @@ namespace PRoConEvents
 			};
 		}
 
-		public List<CPluginVariable> GetPluginVariables()
-		{
-			return new List<CPluginVariable>
-			{
-				new CPluginVariable(VariableName.PunishCommand, typeof(string), _punishCommand),
-				new CPluginVariable(VariableName.ForgiveCommand, typeof(string), _forgiveCommand),
-				new CPluginVariable(VariableName.TeamKillMessage, typeof(string), _teamKillMessage),
-				new CPluginVariable(VariableName.KickCountdownMessage, typeof(string), _kickCountdownMessage),
-				new CPluginVariable(VariableName.KickImminentMessage, typeof(string), _kickImminentMessage),
-				new CPluginVariable(VariableName.VictimPromptMessage, typeof(string), _victimPromptMessage),
-				new CPluginVariable(VariableName.ShowVictimStats, typeof(enumBoolYesNo), _showVictimStats),
-				new CPluginVariable(VariableName.PunishedMessage, typeof(string), _punishedMessage),
-				new CPluginVariable(VariableName.ForgivenMessage, typeof(string), _forgivenMessage),
-				new CPluginVariable(VariableName.NoOneToPunishMessage, typeof(string), _noOneToPunishMessage),
-				new CPluginVariable(VariableName.NoOneToForgiveMessage, typeof(string), _noOneToForgiveMessage),
-				new CPluginVariable(VariableName.PunishWindow, typeof(int), _punishWindow.TotalSeconds),
-				new CPluginVariable(VariableName.HasPunishLimit, typeof(enumBoolYesNo), _hasPunishLimit),
-				new CPluginVariable(VariableName.PunishLimit, typeof(int), _punishLimit),
-				new CPluginVariable(VariableName.Protected, CreateEnumString(typeof(Protect)), _protect.ToString()),
-				new CPluginVariable(VariableName.Whitelist, typeof(string[]), _whitelist.ToArray())
-			};
-		}
-
 		public void SetPluginVariable(string variable, string value)
 		{
-			SaveSetting(variable, value);
+			int i;
+
+			switch (variable)
+			{
+				case VariableGroup.Commands + VariableName.PunishCommand:
+					_punishCommand = value;
+					break;
+
+				case VariableGroup.Commands + VariableName.ForgiveCommand:
+					_forgiveCommand = value;
+					break;
+
+				case VariableGroup.Messages + VariableName.TeamKillMessage:
+					_teamKillMessage = value;
+					break;
+
+				case VariableGroup.Messages + VariableName.KickCountdownMessage:
+					_kickCountdownMessage = value;
+					break;
+
+				case VariableGroup.Messages + VariableName.KickImminentMessage:
+					_kickImminentMessage = value;
+					break;
+
+				case VariableGroup.Messages + VariableName.VictimPromptMessage:
+					_victimPromptMessage = value;
+					break;
+
+				case VariableGroup.Messages + VariableName.ShowVictimStats:
+					_showVictimStats = value == "Yes" ? enumBoolYesNo.Yes : enumBoolYesNo.No;
+					break;
+
+				case VariableGroup.Messages + VariableName.PunishedMessage:
+					_punishedMessage = value;
+					break;
+
+				case VariableGroup.Messages + VariableName.ForgivenMessage:
+					_forgivenMessage = value;
+					break;
+
+				case VariableGroup.Messages + VariableName.NoOneToPunishMessage:
+					_noOneToPunishMessage = value;
+					break;
+
+				case VariableGroup.Messages + VariableName.NoOneToForgiveMessage:
+					_noOneToForgiveMessage = value;
+					break;
+
+				case VariableGroup.Limits + VariableName.PunishWindow:
+
+					if (!int.TryParse(value, out i))
+						return;
+
+					if (i < PunishWindowMin)
+						i = PunishWindowMin;
+
+					if (i > PunishWindowMax)
+						i = PunishWindowMax;
+
+					_punishWindow = TimeSpan.FromSeconds(i);
+
+					break;
+
+				case VariableGroup.Limits + VariableName.HasPunishLimit:
+					_hasPunishLimit = value == "Yes" ? enumBoolYesNo.Yes : enumBoolYesNo.No;
+					break;
+
+				case VariableGroup.Limits + VariableName.PunishLimit:
+
+					if (!int.TryParse(value, out i))
+						return;
+
+					if (i < PunishLimitMin)
+						i = PunishLimitMin;
+
+					if (i > PunishLimitMax)
+						i = PunishLimitMax;
+
+					_punishLimit = i;
+
+					break;
+
+				case VariableGroup.Protection + VariableName.Protected:
+					_protect = (Protect)Enum.Parse(typeof(Protect), value);
+					break;
+
+				case VariableGroup.Protection + VariableName.Whitelist:
+					_whitelist = CPluginVariable.DecodeStringArray(value);
+					break;
+			}
 		}
 
 		#endregion
@@ -639,100 +715,6 @@ namespace PRoConEvents
 			message = ReplaceStaches(message);
 			ExecuteCommand("procon.protected.send", "admin.say", message, "player", player);
 			ExecuteCommand("procon.protected.chat.write", "(AdminSayPlayer " + player + ") " + message);
-		}
-
-		private void SaveSetting(string setting, string value)
-		{
-			int i;
-
-			switch (setting)
-			{
-				case VariableName.TeamKillMessage:
-					_teamKillMessage = value;
-					break;
-
-				case VariableName.KickCountdownMessage:
-					_kickCountdownMessage = value;
-					break;
-
-				case VariableName.KickImminentMessage:
-					_kickImminentMessage = value;
-					break;
-
-				case VariableName.ShowVictimStats:
-					_showVictimStats = value == "Yes" ? enumBoolYesNo.Yes : enumBoolYesNo.No;
-					break;
-
-				case VariableName.PunishCommand:
-					_punishCommand = value;
-					break;
-
-				case VariableName.ForgiveCommand:
-					_forgiveCommand = value;
-					break;
-
-				case VariableName.VictimPromptMessage:
-					_victimPromptMessage = value;
-					break;
-
-				case VariableName.NoOneToPunishMessage:
-					_noOneToPunishMessage = value;
-					break;
-
-				case VariableName.NoOneToForgiveMessage:
-					_noOneToForgiveMessage = value;
-					break;
-
-				case VariableName.PunishedMessage:
-					_punishedMessage = value;
-					break;
-
-				case VariableName.ForgivenMessage:
-					_forgivenMessage = value;
-					break;
-
-				case VariableName.PunishWindow:
-
-					if (!int.TryParse(value, out i))
-						return;
-
-					if (i < PunishWindowMin)
-						i = PunishWindowMin;
-
-					if (i > PunishWindowMax)
-						i = PunishWindowMax;
-
-					_punishWindow = TimeSpan.FromSeconds(i);
-
-					break;
-
-				case VariableName.HasPunishLimit:
-					_hasPunishLimit = value == "Yes" ? enumBoolYesNo.Yes : enumBoolYesNo.No;
-					break;
-
-				case VariableName.PunishLimit:
-
-					if (!int.TryParse(value, out i))
-						return;
-
-					if (i < PunishLimitMin)
-						i = PunishLimitMin;
-
-					if (i > PunishLimitMax)
-						i = PunishLimitMax;
-
-					_punishLimit = i;
-
-					break;
-
-				case VariableName.Protected:
-					_protect = (Protect)Enum.Parse(typeof(Protect), value);
-					break;
-
-				case VariableName.Whitelist:
-					_whitelist = CPluginVariable.DecodeStringArray(value);
-					break;
-			}
 		}
 
 		public string GetDescriptionHtml()
