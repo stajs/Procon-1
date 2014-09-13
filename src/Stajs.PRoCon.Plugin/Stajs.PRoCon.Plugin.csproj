@@ -50,6 +50,12 @@
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PreBuildEvent>del "$(SolutionDir)..\builds\$(ConfigurationName)\Plugins\BF4\TeamKillTracker.*"</PreBuildEvent>
+  </PropertyGroup>
+  <PropertyGroup>
+    <PostBuildEvent>xcopy "$(SolutionDir)Resources\DefaultPlugins\BF4\TeamKillTracker.cs" "$(SolutionDir)..\builds\$(ConfigurationName)\Plugins\BF4\" /Y /E /I</PostBuildEvent>
+  </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
