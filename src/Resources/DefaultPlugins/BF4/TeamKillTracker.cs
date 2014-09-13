@@ -10,7 +10,7 @@ namespace PRoConEvents
 	public class TeamKillTracker : PRoConPluginAPI, IPRoConPluginInterface
 	{
 		public const string Author = "stajs";
-		public const string Version = "0.2.6";
+		public const string Version = "0.2.7";
 
 		private const int PunishWindowMin = 20;
 		private const int PunishWindowMax = 120;
@@ -196,7 +196,7 @@ namespace PRoConEvents
 				new CPluginVariable(VariableGroup.Limits + VariableName.HasPunishLimit, typeof(enumBoolYesNo), _hasPunishLimit),
 				new CPluginVariable(VariableGroup.Limits + VariableName.PunishLimit, typeof(int), _punishLimit),
 				new CPluginVariable(VariableGroup.Protection + VariableName.Protected, CreateEnumString(typeof(Protect)), _protect.ToString()),
-				new CPluginVariable(VariableGroup.Protection + VariableName.Whitelist, typeof(string[]), _whitelist.ToArray())
+				new CPluginVariable(VariableGroup.Protection + VariableName.Whitelist, typeof(string[]), _whitelist.Select(s => s = CPluginVariable.Decode(s)).ToArray())
 			};
 		}
 
@@ -312,7 +312,7 @@ namespace PRoConEvents
 					break;
 
 				case VariableName.Whitelist:
-					_whitelist = CPluginVariable.DecodeStringArray(value);
+					_whitelist = value.Split(new [] { "|" }, StringSplitOptions.RemoveEmptyEntries);
 					break;
 			}
 		}
