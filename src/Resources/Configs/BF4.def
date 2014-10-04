@@ -1,6 +1,6 @@
 /////////////////////////////////////////////
 // This definitions file will be overwritten during an update.
-//  (2014-08-12.01)
+//  (2014-09-30.01)
 // This file contains the standard defintions required to run procon 
 // connected to a BF4 server
 /////////////////////////////////////////////
@@ -47,6 +47,7 @@ procon.protected.serverversions.add BF4 "136921" "R38"
 procon.protected.serverversions.add BF4 "138571" "R39"
 procon.protected.serverversions.add BF4 "139796" "R40"
 procon.protected.serverversions.add BF4 "140136" "R41"
+procon.protected.serverversions.add BF4 "147837" "R42"
 
 procon.protected.specialization.clear
 
@@ -706,6 +707,11 @@ procon.protected.maps.add "TeamDeathMatch0" "XP4_Arctic" "Team Deathmatch" "Oper
 procon.protected.maps.add "TeamDeathMatch0" "XP4_SubBase" "Team Deathmatch" "Hammerhead" 0
 procon.protected.maps.add "TeamDeathMatch0" "XP4_Titan" "Team Deathmatch" "Giants Of Karelia" 0
 procon.protected.maps.add "TeamDeathMatch0" "XP4_Wlkrftry" "Team Deathmatch" "Hangar 21" 0
+
+procon.protected.maps.add "CaptureTheFlag0" "XP4_Arctic" "CTF" "Operation Whiteout" 0
+procon.protected.maps.add "CaptureTheFlag0" "XP4_SubBase" "CTF" "Hammerhead" 0
+procon.protected.maps.add "CaptureTheFlag0" "XP4_Titan" "CTF" "Giants Of Karelia" 0
+procon.protected.maps.add "CaptureTheFlag0" "XP4_Wlkrftry" "CTF" "Hangar 21" 0
 
 procon.protected.teamnames.clear
 
@@ -1885,6 +1891,23 @@ procon.protected.teamnames.add "XP3_UrbanGdn" 2 "global.conquest.cn" "cn.png" "C
 procon.protected.teamnames.add "XP3_WtrFront" 0 "global.conquest.neutral" "" "CaptureTheFlag0"
 procon.protected.teamnames.add "XP3_WtrFront" 1 "global.conquest.us" "us.png" "CaptureTheFlag0"
 procon.protected.teamnames.add "XP3_WtrFront" 2 "global.conquest.cn" "cn.png" "CaptureTheFlag0"
+
+// XP4 (Final Stand)
+procon.protected.teamnames.add "XP4_Arctic" 0 "global.conquest.neutral" "" "CaptureTheFlag0"
+procon.protected.teamnames.add "XP4_Arctic" 1 "global.conquest.us" "us.png" "CaptureTheFlag0"
+procon.protected.teamnames.add "XP4_Arctic" 2 "global.conquest.ru" "ru.png" "CaptureTheFlag0"
+
+procon.protected.teamnames.add "XP4_SubBase" 0 "global.conquest.neutral" "" "CaptureTheFlag0"
+procon.protected.teamnames.add "XP4_SubBase" 1 "global.conquest.us" "us.png" "CaptureTheFlag0"
+procon.protected.teamnames.add "XP4_SubBase" 2 "global.conquest.ru" "ru.png" "CaptureTheFlag0"
+
+procon.protected.teamnames.add "XP4_Titan" 0 "global.conquest.neutral" "" "CaptureTheFlag0"
+procon.protected.teamnames.add "XP4_Titan" 1 "global.conquest.us" "us.png" "CaptureTheFlag0"
+procon.protected.teamnames.add "XP4_Titan" 2 "global.conquest.ru" "ru.png" "CaptureTheFlag0"
+
+procon.protected.teamnames.add "XP4_Wlkrftry" 0 "global.conquest.neutral" "" "CaptureTheFlag0"
+procon.protected.teamnames.add "XP4_Wlkrftry" 1 "global.conquest.us" "us.png" "CaptureTheFlag0"
+procon.protected.teamnames.add "XP4_Wlkrftry" 2 "global.conquest.ru" "ru.png" "CaptureTheFlag0"
 
 
 // Chain Link
